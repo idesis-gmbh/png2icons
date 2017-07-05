@@ -1,0 +1,58 @@
+{
+  "name": "png2icons",
+  "description": "Create Apple ICNS and Microsoft ICO files from PNG",
+  "companyname": "idesis GmbH",
+  "copyright": "©2017, idesis GmbH, ",
+  "version": "0.9.0",
+  "identifier": "de.idesis.png2icons",
+  "keywords": ["icns", "ico", "icon", "icons", "png"],
+  "homepage": "https://github.com/idesis-gmbh/png2icons",
+  "author": {
+    "name": "Michael Nitze",
+    "email": "michael.nitze@idesis.de",
+    "url":" http://www.idesis.de"
+  },
+  "contributors": [
+    "Ivan Kutskir (http://www.photopea.com)",
+    "Guyon Roche (https://github.com/guyonroche)",
+    "Oliver Moran (https://github.com/oliver-moran)"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/idesis-gmbh/png2icons.git"
+  },
+  "readme": "README.md",
+  "bugs": {
+    "url": "https://github.com/idesis-gmbh/png2icons/issues",
+    "email": "produktion@idesis.de"
+  },
+  "private": false,
+  "license": "MIT",
+  "main": "png2icons.js",
+  "bin": {
+    "png2icons": "./png2icons-cli.js"
+  },
+  "files": [
+    "lib/resize2.js",
+    "lib/UPNG.js",
+    "png2icons.js",
+    "png2icons-cli.js",
+    "png2icons.d.ts"
+  ],
+  "types": "png2icons.d.ts",
+  "dependencies": {
+    "pako": "1.0.5"
+  },
+  "devDependencies": {
+    "typescript": "2.3.4",
+    "tslint": "5.4.3",
+    "@types/node": "*"
+  },
+  "scripts": {
+    "test": "node png2icons-cli.js sample/sample.png sample/sample -allp -bc -i",
+    "lint": "tslint --config ./tslint.json ./*.ts ./lib/*.ts",
+    "premake": "npm run lint",
+    "make": "tsc -p tsconfig.json && node -e \"require('fs').unlinkSync('png2icons-cli.d.ts')\""
+  }
+}
+

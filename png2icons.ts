@@ -193,6 +193,7 @@ function appendIcnsChunk(chunkParams: ICNSChunkParams, srcImage: Image, scalingA
  * @returns A buffer which contains the binary data of the ICNS file or null in case of an error.
  */
 export function PNG2ICNS(input: Buffer, scalingAlgorithm: number, printInfo: boolean, numOfColors: number): Buffer | null {
+    UPNG.setWriteLogMessages(printInfo);
     // Source for all resizing actions
     const srcImage: Image | null = decodePNG(input);
     if (!srcImage) {
@@ -389,6 +390,7 @@ function blit(source: Image, target: Image, x: number, y: number) {
  * @returns A buffer which contains the binary data of the ICO file or null in case of an error.
  */
 function PNG2ICO(input: Buffer, scalingAlgorithm: number, printInfo: boolean, numOfColors: number, usePNG: boolean): Buffer | null {
+    UPNG.setWriteLogMessages(printInfo);
     // Source for all resizing actions
     let srcImage: Image | null = decodePNG(input);
     if (!srcImage) {

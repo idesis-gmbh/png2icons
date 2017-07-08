@@ -138,7 +138,7 @@ for (let i = 0; i < Tasks.length; i++) {
     const output: Buffer | null = task.Converter(input, scalingAlgorithm, printInfo, 0);
     if (output) {
         writeFileSync(`${outputFileStub}.${task.FileExt}`, output);
-        if ((Tasks.length > 1) && (i < Tasks.length-1)) {
+        if ((printInfo) && (Tasks.length > 1) && (i < Tasks.length-1)) {
             console.log("");
         }
     }

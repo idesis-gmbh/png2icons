@@ -22,3 +22,6 @@ export declare interface UPNGImage {
 export declare function encode(rgba: ArrayBuffer, width: number, height: number, cnum: number): ArrayBuffer;
 export declare function decode(buffer: ArrayBuffer): UPNGImage;
 export declare function toRGBA8(img: UPNGImage): Uint8Array;
+
+// This function is not part of the original UPNG.js
+export declare function setWriteLogMessages(writeLogMessages: boolean): void;

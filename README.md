@@ -1,17 +1,18 @@
 # png2icons
 
-png2icons generates [Apple ICNS](https://en.wikipedia.org/wiki/Apple_Icon_Image_format) 
+**png2icons generates [Apple ICNS](https://en.wikipedia.org/wiki/Apple_Icon_Image_format) 
 and [Microsoft ICO](https://en.wikipedia.org/wiki/ICO_(file_format)) files from PNG 
-files. The module is platform independent, it works on both Apple and Microsoft 
-systems (and probably other Node.js platforms) without any native dependencies. 
-Node.js module dependencies are minimal (in fact only 
-[one](https://www.npmjs.com/package/pako)). It's also possible to create Microsoft 
-ICO files from non-quadratic source PNGs. A command line interface and an API are 
-provided.
+files.**
+
+The module is platform independent, it works on both Apple and Microsoft systems 
+(and probably other Node.js platforms) without any native dependencies. Node.js module 
+dependencies are minimal (in fact only [one](https://www.npmjs.com/package/pako)). 
+It's also possible to create Microsoft ICO files from non-quadratic source PNGs. 
+A command line interface and an API are provided.
 
 The ideal input is a 24 bit PNG with an alpha channel (RGBA) with 1024×1024 pixels 
-but most other PNG formats are also supported. If you only need to create ICO 
-files 256×256 pixels are sufficient.
+but any other dimensions (even non-quadratic) and most other PNG formats do also 
+work. If you only need to create ICO files 256×256 pixels are sufficient.
 
 
 ## Command line usage
@@ -52,7 +53,7 @@ Example:
 png2icons sample.png icon -allp -bc -i
 ```
 
-This wiil create the files `icon.icns` and `icon.ico` where `icon.ico`
+This will create the files `icon.icns` and `icon.ico` where `icon.ico`
 contains icons in PNG format. During processing info messages will be
 printed to the console.
 

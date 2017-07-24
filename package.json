@@ -3,14 +3,20 @@
   "description": "Create Apple ICNS and Microsoft ICO files from PNG",
   "companyname": "idesis GmbH",
   "copyright": "©2017, idesis GmbH, ",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "identifier": "de.idesis.png2icons",
-  "keywords": ["icns", "ico", "icon", "icons", "png"],
+  "keywords": [
+    "icns",
+    "ico",
+    "icon",
+    "icons",
+    "png"
+  ],
   "homepage": "https://github.com/idesis-gmbh/png2icons",
   "author": {
     "name": "Michael Nitze",
     "email": "michael.nitze@idesis.de",
-    "url":" http://www.idesis.de"
+    "url": " http://www.idesis.de"
   },
   "contributors": [
     "Ivan Kutskir (http://www.photopea.com)",
@@ -55,4 +61,3 @@
     "make": "tsc -p tsconfig.json && node -e \"require('fs').unlinkSync('png2icons-cli.d.ts')\""
   }
 }
-

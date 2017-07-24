@@ -201,16 +201,21 @@ export function PNG2ICNS(input: Buffer, scalingAlgorithm: number, printInfo: boo
     }
     // All available chunk types
     const icnsChunks: Array<ICNSChunkParams> = [
-        { Type: "ic10", Size: 1024, Info: "1024     " },
+        { Type: "ic10", Size: 1024, Info: "512x512@2" },
         { Type: "ic09", Size: 512,  Info: "512x512  " },
         { Type: "ic14", Size: 512,  Info: "256x256@2" },
         { Type: "ic08", Size: 256,  Info: "256x256  " },
         { Type: "ic13", Size: 256,  Info: "128x128@2" },
         { Type: "ic07", Size: 128,  Info: "128x128  " },
         { Type: "ic12", Size: 64,   Info: "32x32@2  " },
-        { Type: "il32", Size: 32,   Info: "32x32    " },
+        // PNG isn't supported for types il32 and is32. If used the Finder will display a scrambled
+        // image in list view. However, the Preview app displays them correctly. The alternative
+        // types icp5 and icp4 (with PNG support) also don't work in Finder but again in Preview.
+        //{ Type: "il32", Size: 32,   Info: "32x32    " },
+        //{ Type: "is32", Size: 16,   Info: "16       " },
+        //{ Type: "icp5", Size: 32,   Info: "32x32    " },
+        //{ Type: "icp4", Size: 16,   Info: "16       " },
         { Type: "ic11", Size: 32,   Info: "16x16@2  " },
-        { Type: "is32", Size: 16,   Info: "16       " },
     ];
     // ICNS header, "icns" + length of file (written later)
     let outBuffer: Buffer | null = Buffer.alloc(8, 0);

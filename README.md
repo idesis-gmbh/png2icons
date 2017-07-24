@@ -17,7 +17,7 @@ work. If you only need to create ICO files 256×256 pixels are sufficient.
 
 ## Command line usage
 
-```bash
+```
 png2icons infile outfile format [-nn | - bl | -bc | -bz | -hm] [-i]
 ```
 
@@ -33,15 +33,15 @@ You have to set `format` to one of the following values:
 | `-all`  | Create both ICNS and ICO format (ICO with BMP) |
 | `-allp` | Create both ICNS and ICO format (ICO with PNG) |
 
-You can optionally set the interpolation algorithm to one of the following params:
+You can optionally set the interpolation algorithm to one of the following parameters:
 
-|  Param | Algorithm |
-|--------|-----------|
-| `-nn` | Nearest Neighbor, fastest, mediocre quality |
-| `-bl` | Bilinear, fast, quality ok |
-| `-bc` | Bicubic, slower, good to very good quality |
-| `-bz` | Bezier, quite slow, very good quality |
-| `-hm` | Hermite, quite slow, very good quality |
+|  Parameter | Interpolation algorithm |
+|------------|-------------------------|
+| `-nn`      | Nearest Neighbor, fastest, mediocre quality |
+| `-bl`      | Bilinear, fast, quality ok |
+| `-bc`      | Bicubic, slower, good to very good quality |
+| `-bz`      | Bezier, quite slow, high quality |
+| `-hm`      | Hermite, quite slow, high quality |
 
 If no interpolation is set *Bicubic* (`-bc`) is used as the default.
 
@@ -49,7 +49,7 @@ With `-i` info messages are printed to the console during processing.
 
 Example:
 
-```bash
+```
 png2icons sample.png icon -allp -bc -i
 ```
 
@@ -62,7 +62,7 @@ printed to the console.
 
 The module exports three functions:
 
-```javascript
+```
 function PNG2ICNS(input, scalingAlgorithm, printInfo, numOfColors)
 function PNG2ICO_PNG(input, scalingAlgorithm, printInfo, numOfColors)
 function PNG2ICO_BMP(input, scalingAlgorithm, printInfo)

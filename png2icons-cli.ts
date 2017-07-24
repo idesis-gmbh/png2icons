@@ -22,6 +22,7 @@ const scalingAlgorithms = [
 // Print usage
 function usage(): void {
 
+    // tslint:disable-next-line:no-shadowed-variable
     const usage: string =
 `usage: ${cli} infile outfile format [-nn | - bl | -bc | -bz | -hm] [-i]
 

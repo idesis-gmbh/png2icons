@@ -16,7 +16,7 @@
   "author": {
     "name": "Michael Nitze",
     "email": "michael.nitze@idesis.de",
-    "url": " http://www.idesis.de"
+    "url": "http://www.idesis.de"
   },
   "contributors": [
     "Ivan Kutskir (http://www.photopea.com)",
@@ -47,16 +47,16 @@
   ],
   "types": "png2icons.d.ts",
   "dependencies": {
-    "pako": "1.0.5"
+    "pako": "1.0.6"
   },
   "devDependencies": {
-    "typescript": "2.4.2",
-    "tslint": "5.5.0",
+    "typescript": "2.7.2",
+    "tslint": "5.9.1",
     "@types/node": "*"
   },
   "scripts": {
     "test": "node png2icons-cli.js sample/sample.png sample/sample -allp -bc -i",
-    "lint": "tslint --config ./tslint.json ./*.ts ./lib/*.ts",
+    "lint": "tslint --exclude ./png2icons.d.ts --config ./tslint.json ./*.ts ./lib/*.ts",
     "premake": "npm run lint",
     "make": "tsc -p tsconfig.json && node -e \"require('fs').unlinkSync('png2icons-cli.d.ts')\""
   }

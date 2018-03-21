@@ -1,4 +1,3 @@
-//import { parse } from "path";
 import { Image } from "./lib/Image";
 import * as Resize from "./lib/resize2";
 import * as UPNG from "./lib/UPNG";
@@ -24,19 +23,52 @@ import * as UPNG from "./lib/UPNG";
  * The MIT License (MIT)
  *
  * Resize images and image blitting (blit, getPixelIndex, scan):
+ * https://github.com/oliver-moran/jimp
  * https://github.com/oliver-moran/jimp/blob/7fd08253b02f0865029ba00f17dbe7a9f38f4d83/resize2.js
  * https://github.com/oliver-moran/jimp/blob/05db5dfb9101585530ec508123ea4feab23df897/index.js
- * https://github.com/oliver-moran/jimp
  * Copyright (c) 2014 Oliver Moran
  * The MIT License (MIT)
  */
 
 ////////////////////////////////////////
+// Logging
+////////////////////////////////////////
+
+/**
+ * Logger function type (compatible with console.log).
+ */
+// tslint:disable-next-line:no-any
+export type Logger = (message: any, ...optionalParams: any[]) => void;
+// External log function.
+let Log: Logger | undefined;
+
+/**
+ * Set an external logger for log messages from png2icons and UPNG.
+ * Note: If no logger is set, *nothing* will ever be logged, not even errors.
+ * @param logger Called with info/error messages during processing.
+ */
+export function setLogger(logger: Logger): void {
+    Log = logger;
+}
+
+/**
+ * Internal log function. Only calls the external logger if it exists.
+ * @param message Primary log message.
+ * @param optionalParams Any number of additional log messages.
+ */
+// tslint:disable-next-line:no-any
+function LogMessage(message: any, ...optionalParams: any[]): void {
+    if (Log) {
+        Log("png2icons", message, ...optionalParams);
+    }
+}
+
+
+////////////////////////////////////////
 // Common code
 ////////////////////////////////////////
 
-// Logging prefix
-const lib: string = "png2icons"; //parse(__filename).name;
+const MAX_COLORS: number = 256;
 
 /**
  * Interploation algorithms for resizing.
@@ -97,7 +129,7 @@ function stretchRect(src: Rect, dst: Rect): Rect {
 }
 
 /**
- * Scale a source image to a new given size.
+ * Scale a source image to fit into a new given size.
  * @see resize.js
  * @param srcImage Source image.
  * @param destRect Destination rectangle to fit the rescaled image into.
@@ -130,18 +162,19 @@ function scaleToFit(srcImage: Image, destRect: Rect, scalingAlgorithm: number): 
  * Create an image form a PNG.
  * @param input A buffer containing the raw PNG data/file.
  * @returns Image An image containing the raw bitmap and the image dimensions.
+ * @see Declaration image.d.ts.
  */
 function decodePNG(input: Buffer): Image | null {
     try {
         // Decoded PNG image
         const PNG: UPNG.UPNGImage = UPNG.decode(input);
         return {
-            data: UPNG.toRGBA8(PNG),
+            data: new Uint8Array(UPNG.toRGBA8(PNG)[0]),
             height: PNG.height,
             width: PNG.width,
         };
-    } catch (error) {
-        console.error(`${lib}: ${error}`);
+    } catch (e) {
+        LogMessage("Couldn't decode PNG", e);
         return null;
     }
 }
@@ -169,16 +202,16 @@ interface ICNSChunkParams {
  */
 function appendIcnsChunk(chunkParams: ICNSChunkParams, srcImage: Image, scalingAlgorithm: number, outBuffer: Buffer, numOfColors: number): Buffer | null {
     try {
-        const icnsChunkRect = stretchRect(getRect(0, 0, srcImage.width, srcImage.height), getRect(0, 0, chunkParams.Size, chunkParams.Size));
-        const scaledRawImage: Buffer = Buffer.from(scaleToFit(srcImage, icnsChunkRect, scalingAlgorithm));
-        const encodedPNG: Buffer = Buffer.from(UPNG.encode(scaledRawImage, icnsChunkRect.Width, icnsChunkRect.Height, (numOfColors < 0) ? 0 : numOfColors));
+        const icnsChunkRect: Rect = stretchRect(getRect(0, 0, srcImage.width, srcImage.height), getRect(0, 0, chunkParams.Size, chunkParams.Size));
+        const scaledRawData: Uint8Array = scaleToFit(srcImage, icnsChunkRect, scalingAlgorithm);
+        const encodedPNG: ArrayBuffer = UPNG.encode([scaledRawData.buffer], icnsChunkRect.Width, icnsChunkRect.Height, numOfColors);
         // Icon header, eg 'ic10' + (length of icon + icon header length)
         const iconHeader: Buffer = Buffer.alloc(8, 0);
         iconHeader.write(chunkParams.Type, 0);
-        iconHeader.writeUInt32BE(encodedPNG.length + 8, 4);
-        return Buffer.concat([outBuffer, iconHeader, encodedPNG], outBuffer.length + iconHeader.length + encodedPNG.length);
-    } catch (error) {
-        console.error(`${lib}: ${error}`);
+        iconHeader.writeUInt32BE(encodedPNG.byteLength + 8, 4);
+        return Buffer.concat([outBuffer, iconHeader, Buffer.from(encodedPNG)], outBuffer.length + iconHeader.length + encodedPNG.byteLength);
+    } catch (e) {
+        LogMessage("Could't append ICNS chunk", e);
         return null;
     }
 }
@@ -188,12 +221,10 @@ function appendIcnsChunk(chunkParams: ICNSChunkParams, srcImage: Image, scalingA
  * @see resize.js, UPNG.js
  * @param input A raw buffer containing the complete source PNG file.
  * @param scalingAlgorithm One of the supported scaling algorithms for resizing.
- * @param printInfo Write infos/errors to console during processing.
- * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless, other values (> 0) means lossy).
+ * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless, other values (<= 256) means lossy).
  * @returns A buffer which contains the binary data of the ICNS file or null in case of an error.
  */
-export function PNG2ICNS(input: Buffer, scalingAlgorithm: number, printInfo: boolean, numOfColors: number): Buffer | null {
-    UPNG.setWriteLogMessages(printInfo);
+export function createICNS(input: Buffer, scalingAlgorithm: number, numOfColors: number): Buffer | null {
     // Source for all resizing actions
     const srcImage: Image | null = decodePNG(input);
     if (!srcImage) {
@@ -221,20 +252,17 @@ export function PNG2ICNS(input: Buffer, scalingAlgorithm: number, printInfo: boo
     let outBuffer: Buffer | null = Buffer.alloc(8, 0);
     outBuffer.write("icns", 0);
     // Append all icon chunks
+    const nOfColors: number = (numOfColors < 0) ? 0 : ((numOfColors > MAX_COLORS) ? MAX_COLORS : numOfColors);
     for (const chunkParams of icnsChunks) {
-        outBuffer = appendIcnsChunk(chunkParams, srcImage, scalingAlgorithm, outBuffer, numOfColors);
+        outBuffer = appendIcnsChunk(chunkParams, srcImage, scalingAlgorithm, outBuffer, nOfColors);
         if (!outBuffer) {
             return null;
         }
-        if (printInfo) {
-            console.log(`${lib}: wrote type ${chunkParams.Type} for size ${chunkParams.Info} with ${chunkParams.Size} pixels`);
-        }
+        LogMessage(`wrote type ${chunkParams.Type} for size ${chunkParams.Info} with ${chunkParams.Size} pixels`);
     }
     // Write total file size at offset 4 of output and return final result
     outBuffer.writeUInt32BE(outBuffer.length, 4);
-    if (printInfo) {
-        console.log(`${lib}: done`);
-    }
+    LogMessage("done");
     return outBuffer;
 }
 
@@ -310,7 +338,7 @@ function getBITMAPINFOHEADER(image: Image): Buffer {
 /**
  * Get a DIB representation of the raw image data in an image.
  * Bitmap data starts with the lower left hand corner of the image.
- * Blue, green, red, alpha in order.
+ * Pixel order is blue, green, red, alpha.
  * @see https://en.wikipedia.org/wiki/BMP_file_format
  * @param image Source image.
  * @returns Buffer The DIB for the given image.
@@ -382,20 +410,17 @@ function blit(source: Image, target: Image, x: number, y: number) {
 }
 
 /**
- * The main function which creates the Microsoft ICO format.
+ * Create the Microsoft ICO format using PNG or Windows bitmaps for every icon.
  * @see https://en.wikipedia.org/wiki/ICO_(file_format)
  * @see resize.js, UPNG.js
  * @param input A raw buffer containing the complete source PNG file.
  * @param scalingAlgorithm One of the supported scaling algorithms for resizing.
- * @param printInfo Write infos/errors to console during processing.
- * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless,
- *        other values (> 0) means lossy). Only used if "usePNG" is true.
+ * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless, other values (<= 256) means lossy). Only used if "usePNG" is true.
  * @param usePNG Store each chunk in the generated output in either PNG or Windows BMP format.
  *        PNG as opposed to DIB is valid but older Windows versions may not be able to display it.
  * @returns A buffer which contains the binary data of the ICO file or null in case of an error.
  */
-function PNG2ICO(input: Buffer, scalingAlgorithm: number, printInfo: boolean, numOfColors: number, usePNG: boolean): Buffer | null {
-    UPNG.setWriteLogMessages(printInfo);
+export function createICO(input: Buffer, scalingAlgorithm: number, numOfColors: number, usePNG: boolean): Buffer | null {
     // Source for all resizing actions
     let srcImage: Image | null = decodePNG(input);
     if (!srcImage) {
@@ -440,56 +465,68 @@ function PNG2ICO(input: Buffer, scalingAlgorithm: number, printInfo: boolean, nu
         const icoChunkRect = stretchRect(getRect(0, 0, srcImage.width, srcImage.height), getRect(0, 0, icoChunkSize, icoChunkSize));
         // Get scaled raw image
         const scaledRawImage: Image = {
-            data: Buffer.from(scaleToFit(srcImage, icoChunkRect, scalingAlgorithm)),
+            data: scaleToFit(srcImage, icoChunkRect, scalingAlgorithm),
             height: icoChunkRect.Height,
             width: icoChunkRect.Width,
         };
         // Store entry header, store image and get offset for next image
         icoDirectory.push(getICONDIRENTRY(scaledRawImage, chunkOffset, usePNG));
         if (usePNG) {
-            const encodedPNG: Buffer = Buffer.from(UPNG.encode(scaledRawImage.data, icoChunkRect.Width, icoChunkRect.Height, (numOfColors < 0) ? 0 : numOfColors));
-            icoChunkImages.push(encodedPNG);
-            chunkOffset += encodedPNG.length;
+            const encodedPNG: ArrayBuffer = UPNG.encode([scaledRawImage.data.buffer], icoChunkRect.Width, icoChunkRect.Height, (numOfColors < 0) ? 0 : ((numOfColors > MAX_COLORS) ? MAX_COLORS : numOfColors));
+            icoChunkImages.push(Buffer.from(encodedPNG));
+            chunkOffset += encodedPNG.byteLength;
         } else {
             const bmpInfoHeader = getBITMAPINFOHEADER(scaledRawImage);
             const DIB = getDIB(scaledRawImage);
             icoChunkImages.push(bmpInfoHeader, DIB);
             chunkOffset += (bmpInfoHeader.length + DIB.length);
         }
-        if (printInfo) {
-            console.log(`${lib}: wrote ${usePNG ? "png" : "bmp"} icon for size ${icoChunkSize}`);
-        }
+        LogMessage(`wrote ${usePNG ? "png" : "bmp"} icon for size ${icoChunkSize}`);
     }
-    if (printInfo) {
-        console.log(`${lib}: done`);
-    }
+    LogMessage(`done`);
     return Buffer.concat(icoDirectory.concat(icoChunkImages));
 }
 
+
+////////////////////////////////////////
+// Deprecated functions
+////////////////////////////////////////
+
 /**
- * Create the Microsoft ICO format using PNG for every icon.
- * @see https://en.wikipedia.org/wiki/ICO_(file_format)
- * @see resize.js, UPNG.js
- * @param input A raw buffer containing the complete source PNG file.
- * @param scalingAlgorithm One of the supported scaling algorithms for resizing.
- * @param printInfo Write infos/errors to console during processing.
- * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless,
- *        other values (> 0) means lossy). Only used if "usePNG" is true.
- * @returns A buffer which contains the binary data of the ICO file or null in case of an error.
+ * Deprecated, see README.md.
+ * @deprecated
  */
-export function PNG2ICO_PNG(input: Buffer, scalingAlgorithm: number, printInfo: boolean, numOfColors: number): Buffer | null {
-    return PNG2ICO(input, scalingAlgorithm, printInfo, numOfColors, true);
+export function PNG2ICNS(input: Buffer, scalingAlgorithm: number, printInfo: boolean, numOfColors: number): Buffer | null {
+    const oldLogger: Logger | undefined = Log;
+    let result: Buffer | null;
+    printInfo ? (Log = console.log) : (Log = undefined);
+    result = createICNS(input, scalingAlgorithm, numOfColors);
+    Log = oldLogger;
+    return result;
 }
 
 /**
- * Create the Microsoft ICO format using BMP for every icon.
- * @see https://en.wikipedia.org/wiki/ICO_(file_format)
- * @see resize.js, UPNG.js
- * @param input A raw buffer containing the complete source PNG file.
- * @param scalingAlgorithm One of the supported scaling algorithms for resizing.
- * @param printInfo Write infos/errors to console during processing.
- * @returns A buffer which contains the binary data of the ICO file or null in case of an error.
+ * Deprecated, see README.md.
+ * @deprecated
+ */
+export function PNG2ICO_PNG(input: Buffer, scalingAlgorithm: number, printInfo: boolean, numOfColors: number): Buffer | null {
+    const oldLogger: Logger | undefined = Log;
+    let result: Buffer | null;
+    printInfo ? (Log = console.log) : (Log = undefined);
+    result = createICO(input, scalingAlgorithm, numOfColors, true);
+    Log = oldLogger;
+    return result;
+}
+
+/**
+ * Deprecated, see README.md.
+ * @deprecated
  */
 export function PNG2ICO_BMP(input: Buffer, scalingAlgorithm: number, printInfo: boolean): Buffer | null {
-    return PNG2ICO(input, scalingAlgorithm, printInfo, 0, false);
+    const oldLogger: Logger | undefined = Log;
+    let result: Buffer | null;
+    printInfo ? (Log = console.log) : (Log = undefined);
+    result = createICO(input, scalingAlgorithm, 0, false);
+    Log = oldLogger;
+    return result;
 }

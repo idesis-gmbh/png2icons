@@ -18,11 +18,21 @@ const scalingAlgorithms = [
     "Hermite",
 ];
 
+// Simple logging to console
+// tslint:disable-next-line:no-any
+const consoleLogger: PNG2ICONS.Logger = (message: any, ...optionalParams: any[]) => {
+    // Always log errors, regardless of printInfo. By convention all code must
+    // call this method with an Error as the *last* parameter if an error occured.
+    const err: Error = optionalParams[optionalParams.length-1];
+    if (err instanceof Error) {
+        console.error(message, ...optionalParams[0], "\n", ...optionalParams.slice(1, optionalParams.length-1), err.stack);
+    } else if (printInfo) {
+        console.log(message, ...optionalParams);
+    }
+};
 
 // Print usage
-function usage(): void {
-
-    // tslint:disable-next-line:no-shadowed-variable
+function printUsage(): void {
     const usage: string =
 `usage: ${cli} infile outfile format [-nn | - bl | -bc | -bz | -hm] [-i]
 
@@ -43,7 +53,6 @@ Scaling algorithms:
   -hm (Hermite)
 
 -i  print messages`;
-
     console.log(usage);
     process.exit(1);
 }
@@ -67,15 +76,15 @@ function evalArg(arg: string): void {
 
 // Invalid argc or unknown args
 if ((argc < 5) || (argc > 7)) {
-    usage();
+    printUsage();
 }
 outputFormat = process.argv[4];
 if (["-icns", "-ico", "-icop", "-all", "-allp"].indexOf(outputFormat) === -1) {
-    usage();
+    printUsage();
 }
 for (let i = 5; i < argc; i++) {
     if (["-nn", "-bl", "-bc", "-bz", "-hm", "-i"].indexOf(process.argv[i]) === -1) {
-        usage();
+        printUsage();
     }
 }
 
@@ -84,12 +93,12 @@ evalArg(process.argv[5]);
 if (argc === 7) {
     // -i used twice
     if (printInfo && (process.argv[6] === "-i")) {
-        usage();
+        printUsage();
     } else {
         evalArg(process.argv[6]);
-        // Two scaling algorithms given
+        // Two scaling algorithms instead of -i given
         if (!printInfo) {
-            usage();
+            printUsage();
         }
     }
 }
@@ -97,50 +106,48 @@ if (argc === 7) {
 // Main
 interface Task {
     Format: string;
+    UsePNG: boolean;
     FileExt: string;
-    Converter: (input: Buffer, scalingAlgorithm: number, printInfo: Boolean, numOfColors: number) => Buffer | null;
+    ConverterFnc: (input: Buffer, scalingAlgorithm: number, numOfColors: number, usePNG?: boolean) => Buffer | null;
 }
 
 const Tasks: Array<Task> = [];
 
 if (outputFormat === "-icns") {
-    Tasks.push( { Format: "ICNS", FileExt: "icns", Converter: PNG2ICONS.PNG2ICNS} );
+    Tasks.push( { Format: "ICNS", UsePNG: true, FileExt: "icns", ConverterFnc: PNG2ICONS.createICNS } );
 } else if (outputFormat === "-ico") {
-    Tasks.push( { Format: "ICO (BMP)", FileExt: "ico", Converter: PNG2ICONS.PNG2ICO_BMP} );
+    Tasks.push( { Format: "ICO (BMP)", UsePNG: false, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO } );
 } else if (outputFormat === "-icop") {
-    Tasks.push( { Format: "ICO (PNG)", FileExt: "ico", Converter: PNG2ICONS.PNG2ICO_PNG} );
+    Tasks.push( { Format: "ICO (PNG)", UsePNG: true, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO } );
 } else if (outputFormat === "-all") {
-    Tasks.push( { Format: "ICNS", FileExt: "icns", Converter: PNG2ICONS.PNG2ICNS} );
-    Tasks.push( { Format: "ICO (BMP)", FileExt: "ico", Converter: PNG2ICONS.PNG2ICO_BMP} );
+    Tasks.push( { Format: "ICNS", UsePNG: true, FileExt: "icns", ConverterFnc: PNG2ICONS.createICNS } );
+    Tasks.push( { Format: "ICO (BMP)", UsePNG: false, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO} );
 } else if (outputFormat === "-allp") {
-    Tasks.push( { Format: "ICNS", FileExt: "icns", Converter: PNG2ICONS.PNG2ICNS} );
-    Tasks.push( { Format: "ICO (PNG)", FileExt: "ico", Converter: PNG2ICONS.PNG2ICO_PNG} );
-} else {
-    usage(); //??
+    Tasks.push( { Format: "ICNS", UsePNG: true, FileExt: "icns", ConverterFnc: PNG2ICONS.createICNS } );
+    Tasks.push( { Format: "ICO (PNG)", UsePNG: true, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO} );
+} else { //??
+    printUsage();
 }
 
 const inputFile: string = resolve(process.argv[2]);
 const outputFileStub: string = resolve(process.argv[3]);
 const input: Buffer = readFileSync(resolve(inputFile));
+PNG2ICONS.setLogger(consoleLogger);
 
 for (let i = 0; i < Tasks.length; i++) {
     const task = Tasks[i];
-    if (printInfo) {
-        const info: string =
-
-`${cli}:
+    const taskInfo: string =
+`${cli}
   input:    ${inputFile}
   output:   ${outputFileStub}.${task.FileExt}
   scaling:  ${scalingAlgorithms[scalingAlgorithm]}
   format:   ${task.Format}`;
-
-        console.log(info);
-    }
-    const output: Buffer | null = task.Converter(input, scalingAlgorithm, printInfo, 0);
+    consoleLogger(taskInfo);
+    const output: Buffer | null = task.ConverterFnc(input, scalingAlgorithm, 0, task.UsePNG);
     if (output) {
         writeFileSync(`${outputFileStub}.${task.FileExt}`, output);
-        if ((printInfo) && (Tasks.length > 1) && (i < Tasks.length-1)) {
-            console.log("");
-        }
+    }
+    if ((printInfo) && (Tasks.length > 1) && (i < Tasks.length-1)) {
+        consoleLogger("");
     }
 }

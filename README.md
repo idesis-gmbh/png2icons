@@ -1,3 +1,5 @@
+***Note: v.1.0.0 introduces a breaking API change. Please see "Deprecated API" below.***
+
 # png2icons
 
 **png2icons generates [Apple ICNS](https://en.wikipedia.org/wiki/Apple_Icon_Image_format) 
@@ -63,17 +65,15 @@ printed to the console.
 The module exports three functions:
 
 ```
-function PNG2ICNS(input, scalingAlgorithm, printInfo, numOfColors)
-function PNG2ICO_PNG(input, scalingAlgorithm, printInfo, numOfColors)
-function PNG2ICO_BMP(input, scalingAlgorithm, printInfo)
+function createICNS(input, scalingAlgorithm, numOfColors)
+function createICO(input, scalingAlgorithm, numOfColors, usePNG)
+function setLogger(logFnc)
 ```
 
-`PNG2ICNS` creates the Apple ICNS format, `PNG2ICO_PNG` and `PNG2ICO_BMP` create 
-the Microsoft ICO format where `PNG2ICO_PNG` uses PNG for each icon in the file 
-and `PNG2ICO_BMP` Windows Bitmaps. Please note that PNG in ICO files may lead to 
-problems in Windows versions older than Vista.
+`createICNS` creates the Apple ICNS format, `createICO` creates the Microsoft 
+ICO format.
 
-Parameters identical for all three functions:
+Parameters identical for both `create*` functions:
 
 - `input` is a buffer containing the raw content of a PNG file, obtained, for 
   example, with `fs.readFileSync`.
@@ -89,20 +89,27 @@ Parameters identical for all three functions:
     RESIZE_HERMITE = 4;
     ```
 
-- The boolean parameter `printInfo` enables/disables logging of info strings to 
-  the console during processing. Please note that you cannot turn off some of 
-  the warnings or error messages.
+- When using PNG for the icons `numOfColors` controls the reduction of colors in 
+  the compressed output. A value of `0` retains all colors from `input` (lossless),
+  a value greater than `0` reduces the colors to the given number (per color channel,
+  so `256` is the maximum value). This can lead to much smaller files. Please note: 
+  `numOfColors` is ignored if `usePNG` is set to `false` (`createICO`).
 
-When using PNG for the icons `numOfColors` controls the reduction of colors in 
-the compressed output. A value of `0` retains all colors from `input` (lossless),
-a value greater than 0 reduces the colors to the given number. This can lead to
-much smaller files.
+If the boolean parameter `usePNG` for `createICO` is set to `true` this function 
+will use PNG for each icon in the created ICO file, otherwise Windows bitmaps will 
+be used. Please note that PNG in ICO files may lead to problems in Windows versions 
+older than Vista.
+
+With `setLogger` you can supply your own logging function. The logging function
+(`logFnc`) must accept the same parameters like `console.log`, so you could use 
+that in simple cases, e. g. `setLogger(console.log)`. No logging function is set
+by default.
 
 The return value is `null` in case of an error, otherwise a buffer which contains 
 the binary data of the generated ICNS/ICO file is returned. You could use, for 
 example, `fs.writeFileSync` to save it as a file. 
 
-Example:
+**Example:**
 
 ```javascript
 var png2icons = require("png2icons");
@@ -111,7 +118,58 @@ var fs = require("fs");
 var input = fs.readFileSync("sample.png");
 
 // Apple ICNS with bilinear interpolation and no color reduction.
-// Print info messages
+// Log infos via console.log.
+png2icons.setLogger(console.log);
+var output = png2icons.createICNS(input, png2icons.BILINEAR, 0);
+if (output) {
+    fs.writeFileSync("icon.icns", output);
+}
+
+// Microsoft ICO using PNG icons with Bezier interpolation and 
+// reduction to 20 colors. 
+// Log infos via console.log (logging function already set before).
+output = png2icons.createICO(input, png2icons.BEZIER, 20, true);
+fs.writeFileSync("icon.ico", output);
+
+// Microsoft ICO using BMP icons with bicubic interpolation,
+// (numOfColors is ignored). Prevent any logging.
+png2icons.setLogger(null);
+output = png2icons.createICO(input, png2icons.BICUBIC, 0, false);
+fs.writeFileSync("icon_bmp.ico", output);
+```
+
+
+### Deprecated API
+
+The (now deprecated) functions of v. 0.9.1 are still available for backwards
+compatibility but you should use the current API. These functions will be removed 
+in future releases. These deprecated functions have the old names and still 
+contain the boolean parameter `printInfo`:
+
+```
+function PNG2ICNS(input, scalingAlgorithm, printInfo, numOfColors)
+function PNG2ICO_PNG(input, scalingAlgorithm, printInfo, numOfColors)
+function PNG2ICO_BMP(input, scalingAlgorithm, printInfo)
+```
+
+The boolean parameter `printInfo` enables/disables logging of info strings to 
+the *console* during processing.
+
+If you've already set a custom logging function with `setLogger` then this will
+be kept, that is, setting `printInfo` to `true` or `false` has no influence on 
+the custom logging function. Settting `printInfo` to `true` will always log to
+the *console*, it won't use an already exsting supplied function.
+
+**Example:**
+
+```javascript
+var png2icons = require("png2icons");
+var fs = require("fs");
+
+var input = fs.readFileSync("sample.png");
+
+// Apple ICNS with bilinear interpolation and no color reduction.
+// Print info messages.
 var output = png2icons.PNG2ICNS(input, png2icons.BILINEAR, true, 0);
 if (output) {
     fs.writeFileSync("icon.icns", output);
@@ -123,10 +181,10 @@ output = png2icons.PNG2ICO_PNG(input, png2icons.BEZIER, true, 20);
 fs.writeFileSync("icon.ico", output);
 
 // Microsoft ICO using BMP icons with bicubic interpolation.
-// Don't print info messages
+// Don't print info messages.
 output = png2icons.PNG2ICO_BMP(input, png2icons.BICUBIC, false);
 fs.writeFileSync("icon_bmp.ico", output);
-```
+````
 
 
 ## Development

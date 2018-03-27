@@ -3,7 +3,7 @@
   "description": "Create Apple ICNS and Microsoft ICO files from PNG",
   "companyname": "idesis GmbH",
   "copyright": "©2017, 2018, idesis GmbH",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "identifier": "de.idesis.png2icons",
   "keywords": [
     "icns",
@@ -41,6 +41,7 @@
   "files": [
     "lib/resize2.js",
     "lib/UPNG.js",
+    "sample/sample.png",
     "png2icons.js",
     "png2icons-cli.js",
     "png2icons.d.ts"

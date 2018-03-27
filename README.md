@@ -1,6 +1,6 @@
-***Note: v.1.0.0 introduces a breaking API change. Please see "Deprecated API" below.***
-
 # png2icons
+
+***Note: v.1.0.0 introduced a breaking API change. Please see "Deprecated API" below.***
 
 **png2icons generates [Apple ICNS](https://en.wikipedia.org/wiki/Apple_Icon_Image_format) 
 and [Microsoft ICO](https://en.wikipedia.org/wiki/ICO_(file_format)) files from PNG 
@@ -211,3 +211,5 @@ This module wouldn't have been possible without code from the following projects
 ## License
 
 MIT © [idesis GmbH](http://www.idesis.de), Rellinghauser Straße 334F, D-45136 Essen
+
+See the `LICENSE` file for details.

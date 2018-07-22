@@ -51,13 +51,13 @@
     "pako": "1.0.6"
   },
   "devDependencies": {
-    "typescript": "2.7.2",
-    "tslint": "5.9.1",
+    "typescript": "2.9.2",
+    "tslint": "5.11.0",
     "@types/node": "*"
   },
   "scripts": {
     "test": "node png2icons-cli.js sample/sample.png sample/sample -allp -bc -i",
-    "lint": "tslint --exclude ./png2icons.d.ts --config ./tslint.json ./*.ts ./lib/*.ts",
+    "lint": "tslint --project ./tsconfig.json --config ./tslint.json",
     "premake": "npm run lint",
     "make": "tsc -p tsconfig.json && node -e \"require('fs').unlinkSync('png2icons-cli.d.ts')\""
   }

@@ -4,12 +4,30 @@ import { readFileSync, writeFileSync } from "fs";
 import { parse, resolve } from "path";
 import * as PNG2ICONS from "./png2icons";
 
+/**
+ * Number of arguments.
+ */
 const argc: number = process.argv.length;
+/**
+ * Name of "executable".
+ */
 const cli: string = parse(__filename).name;
+/**
+ * Desired output format.
+ */
 let outputFormat: string;
+/**
+ * Scaling algorithm to use.
+ */
 let scalingAlgorithm: number = PNG2ICONS.BICUBIC;
+/**
+ * Log to console?
+ */
 let printInfo: boolean = false;
 
+/**
+ * Names of scaling algorithms.
+ */
 const scalingAlgorithms = [
     "Nearest Neighbor",
     "Bilinear",
@@ -18,20 +36,25 @@ const scalingAlgorithms = [
     "Hermite",
 ];
 
-// Simple logging to console
-// tslint:disable-next-line:no-any
+/**
+ * Simple logging to console.
+ * @param message The main message to log.
+ * @param optionalParams Additional messages to log.
+ */
 const consoleLogger: PNG2ICONS.Logger = (message: any, ...optionalParams: any[]) => {
     // Always log errors, regardless of printInfo. By convention all code must
     // call this method with an Error as the *last* parameter if an error occured.
-    const err: Error = optionalParams[optionalParams.length-1];
+    const err: Error = optionalParams[optionalParams.length - 1];
     if (err instanceof Error) {
-        console.error(message, ...optionalParams[0], "\n", ...optionalParams.slice(1, optionalParams.length-1), err.stack);
+        console.error(message, ...optionalParams[0], "\n", ...optionalParams.slice(1, optionalParams.length - 1), err.stack);
     } else if (printInfo) {
         console.log(message, ...optionalParams);
     }
 };
 
-// Print usage
+/**
+ * Print usage.
+ */
 function printUsage(): void {
     const usage: string =
 `usage: ${cli} infile outfile format [-nn | - bl | -bc | -bz | -hm] [-i]
@@ -57,7 +80,10 @@ Scaling algorithms:
     process.exit(1);
 }
 
-// Get arguments
+/**
+ * Get arguments.
+ * @param arg Argument to evaluate.
+ */
 function evalArg(arg: string): void {
     if (arg === "-nn") {
         scalingAlgorithm = PNG2ICONS.NEAREST_NEIGHBOR;
@@ -74,7 +100,7 @@ function evalArg(arg: string): void {
     }
 }
 
-// Invalid argc or unknown args
+// Invalid argc or unknown args.
 if ((argc < 5) || (argc > 7)) {
     printUsage();
 }
@@ -88,7 +114,7 @@ for (let i = 5; i < argc; i++) {
     }
 }
 
-// Either only debug or only a scaling algorithm is set
+// Either only debug or only a scaling algorithm is set.
 evalArg(process.argv[5]);
 if (argc === 7) {
     // -i used twice
@@ -104,38 +130,54 @@ if (argc === 7) {
 }
 
 // Main
-interface Task {
+/**
+ * Describes a task object to be executed.
+ */
+interface ITask {
     Format: string;
     UsePNG: boolean;
     FileExt: string;
     ConverterFnc: (input: Buffer, scalingAlgorithm: number, numOfColors: number, usePNG?: boolean) => Buffer | null;
 }
 
-const Tasks: Array<Task> = [];
+/**
+ * An array for all tasks to be executed.
+ */
+const tasks: ITask[] = [];
 
 if (outputFormat === "-icns") {
-    Tasks.push( { Format: "ICNS", UsePNG: true, FileExt: "icns", ConverterFnc: PNG2ICONS.createICNS } );
+    tasks.push({ Format: "ICNS", UsePNG: true, FileExt: "icns", ConverterFnc: PNG2ICONS.createICNS });
 } else if (outputFormat === "-ico") {
-    Tasks.push( { Format: "ICO (BMP)", UsePNG: false, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO } );
+    tasks.push({ Format: "ICO (BMP)", UsePNG: false, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO });
 } else if (outputFormat === "-icop") {
-    Tasks.push( { Format: "ICO (PNG)", UsePNG: true, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO } );
+    tasks.push({ Format: "ICO (PNG)", UsePNG: true, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO });
 } else if (outputFormat === "-all") {
-    Tasks.push( { Format: "ICNS", UsePNG: true, FileExt: "icns", ConverterFnc: PNG2ICONS.createICNS } );
-    Tasks.push( { Format: "ICO (BMP)", UsePNG: false, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO} );
+    tasks.push({ Format: "ICNS", UsePNG: true, FileExt: "icns", ConverterFnc: PNG2ICONS.createICNS });
+    tasks.push({ Format: "ICO (BMP)", UsePNG: false, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO});
 } else if (outputFormat === "-allp") {
-    Tasks.push( { Format: "ICNS", UsePNG: true, FileExt: "icns", ConverterFnc: PNG2ICONS.createICNS } );
-    Tasks.push( { Format: "ICO (PNG)", UsePNG: true, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO} );
-} else { //??
+    tasks.push({ Format: "ICNS", UsePNG: true, FileExt: "icns", ConverterFnc: PNG2ICONS.createICNS });
+    tasks.push({ Format: "ICO (PNG)", UsePNG: true, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO});
+} else { // ??
     printUsage();
 }
 
-const inputFile: string = resolve(process.argv[2]);
-const outputFileStub: string = resolve(process.argv[3]);
-const input: Buffer = readFileSync(resolve(inputFile));
 PNG2ICONS.setLogger(consoleLogger);
 
-for (let i = 0; i < Tasks.length; i++) {
-    const task = Tasks[i];
+/**
+ * The input file (PNG format).
+ */
+const inputFile: string = resolve(process.argv[2]);
+/**
+ * The output file name (without extension).
+ */
+const outputFileStub: string = resolve(process.argv[3]);
+/**
+ * The buffer containing the complete content of the input PNG file.
+ */
+const input: Buffer = readFileSync(resolve(inputFile));
+
+for (let i = 0; i < tasks.length; i++) {
+    const task = tasks[i];
     const taskInfo: string =
 `${cli}
   input:    ${inputFile}
@@ -147,7 +189,7 @@ for (let i = 0; i < Tasks.length; i++) {
     if (output) {
         writeFileSync(`${outputFileStub}.${task.FileExt}`, output);
     }
-    if ((printInfo) && (Tasks.length > 1) && (i < Tasks.length-1)) {
+    if ((printInfo) && (tasks.length > 1) && (i < tasks.length - 1)) {
         consoleLogger("");
     }
 }

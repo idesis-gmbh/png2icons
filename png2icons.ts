@@ -37,10 +37,11 @@ import * as UPNG from "./lib/UPNG";
 /**
  * Logger function type (compatible with console.log).
  */
-// tslint:disable-next-line:no-any
 export type Logger = (message: any, ...optionalParams: any[]) => void;
-// External log function.
-let Log: Logger | undefined;
+/**
+ * External log function.
+ */
+let logFnc: Logger | undefined;
 
 /**
  * Set an external logger for log messages from png2icons and UPNG.
@@ -48,7 +49,7 @@ let Log: Logger | undefined;
  * @param logger Called with info/error messages during processing.
  */
 export function setLogger(logger: Logger): void {
-    Log = logger;
+    logFnc = logger;
 }
 
 /**
@@ -56,32 +57,51 @@ export function setLogger(logger: Logger): void {
  * @param message Primary log message.
  * @param optionalParams Any number of additional log messages.
  */
-// tslint:disable-next-line:no-any
 function LogMessage(message: any, ...optionalParams: any[]): void {
-    if (Log) {
-        Log("png2icons", message, ...optionalParams);
+    if (logFnc) {
+        logFnc("png2icons", message, ...optionalParams);
     }
 }
-
 
 ////////////////////////////////////////
 // Common code
 ////////////////////////////////////////
 
+/**
+ * Maximum number of colors for color reduction.
+ */
 const MAX_COLORS: number = 256;
 
 /**
- * Interploation algorithms for resizing.
+ * `Nearest neighbor` resizing interploation algorithm.
  * @see resize.js
  */
 export const NEAREST_NEIGHBOR = 0;
+/**
+ * `Bilinear` resizing interploation algorithm.
+ * @see resize.js
+ */
 export const BILINEAR = 1;
+/**
+ * `Bicubic` resizing interploation algorithm.
+ * @see resize.js
+ */
 export const BICUBIC = 2;
+/**
+ * `Bezier` resizing interploation algorithm.
+ * @see resize.js
+ */
 export const BEZIER = 3;
+/**
+ * `Hermite` resizing interploation algorithm.
+ * @see resize.js
+ */
 export const HERMITE = 4;
 
-// Rectangle
-interface Rect {
+/**
+ * Simple rectangle.
+ */
+interface IRect {
     Left: number;
     Top: number;
     Width: number;
@@ -96,7 +116,7 @@ interface Rect {
  * @param height Height of rectangle.
  * @returns A new rectangle created from the input parameters.
  */
-function getRect(left: number, top: number, width: number, height: number): Rect {
+function getRect(left: number, top: number, width: number, height: number): IRect {
     return { Left: left, Top: top, Width: width, Height: height };
 }
 
@@ -106,10 +126,10 @@ function getRect(left: number, top: number, width: number, height: number): Rect
  * @param dst Destination rectangle.
  * @returns A new rectangle where "src" has been upsized/downsized proportionally to fit exactly in to "dst".
  */
-function stretchRect(src: Rect, dst: Rect): Rect {
+function stretchRect(src: IRect, dst: IRect): IRect {
     let f: number;
     let tmp: number;
-    const result: Rect = getRect(0, 0, 0, 0);
+    const result: IRect = getRect(0, 0, 0, 0);
     if ((src.Width / src.Height) >= (dst.Width / dst.Height)) {
         f = (dst.Width / src.Width);
         result.Left = 0;
@@ -136,7 +156,7 @@ function stretchRect(src: Rect, dst: Rect): Rect {
  * @param scalingAlgorithm Scaling method (one of the constants NEAREST_NEIGHBOR, BILINEAR, ...).
  * @returns Uint8Array The rescaled image.
  */
-function scaleToFit(srcImage: Image, destRect: Rect, scalingAlgorithm: number): Uint8Array {
+function scaleToFit(srcImage: Image, destRect: IRect, scalingAlgorithm: number): Uint8Array {
     const scaleResult: Image = {
         data: new Uint8Array(destRect.Width * destRect.Height * 4),
         height: destRect.Height,
@@ -183,8 +203,10 @@ function decodePNG(input: Buffer): Image | null {
 // Apple ICNS
 ////////////////////////////////////////
 
-// Data for one icon chunk
-interface ICNSChunkParams {
+/**
+ * Data for one icon chunk.
+ */
+interface IICNSChunkParams {
     Type: string;
     Size: number;
     Info: string;
@@ -198,18 +220,32 @@ interface ICNSChunkParams {
  * @param scalingAlgorithm Scaling method (one of the constants NEAREST_NEIGHBOR, BILINEAR, ...).
  * @param outBuffer The buffer where the generated chunk *shall be* appended to.
  * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless, other values (> 0) means lossy).
- * @returns The buffer where the generated chunk *has been* appended to (outbuffer+icon chunk) or null if an error occured.
+ * @returns The buffer where the generated chunk *has been* appended to (outbuffer+icon chunk)
+ *      or null if an error occured.
  */
-function appendIcnsChunk(chunkParams: ICNSChunkParams, srcImage: Image, scalingAlgorithm: number, outBuffer: Buffer, numOfColors: number): Buffer | null {
+function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scalingAlgorithm: number,
+                         outBuffer: Buffer, numOfColors: number): Buffer | null {
     try {
-        const icnsChunkRect: Rect = stretchRect(getRect(0, 0, srcImage.width, srcImage.height), getRect(0, 0, chunkParams.Size, chunkParams.Size));
+        const icnsChunkRect: IRect = stretchRect(
+            getRect(0, 0, srcImage.width, srcImage.height),
+            getRect(0, 0, chunkParams.Size,
+            chunkParams.Size),
+        );
         const scaledRawData: Uint8Array = scaleToFit(srcImage, icnsChunkRect, scalingAlgorithm);
-        const encodedPNG: ArrayBuffer = UPNG.encode([scaledRawData.buffer], icnsChunkRect.Width, icnsChunkRect.Height, numOfColors);
+        const encodedPNG: ArrayBuffer = UPNG.encode(
+            [scaledRawData.buffer],
+            icnsChunkRect.Width,
+            icnsChunkRect.Height,
+            numOfColors,
+        );
         // Icon header, eg 'ic10' + (length of icon + icon header length)
         const iconHeader: Buffer = Buffer.alloc(8, 0);
         iconHeader.write(chunkParams.Type, 0);
         iconHeader.writeUInt32BE(encodedPNG.byteLength + 8, 4);
-        return Buffer.concat([outBuffer, iconHeader, Buffer.from(encodedPNG)], outBuffer.length + iconHeader.length + encodedPNG.byteLength);
+        return Buffer.concat(
+            [outBuffer, iconHeader, Buffer.from(encodedPNG)],
+            outBuffer.length + iconHeader.length + encodedPNG.byteLength,
+        );
     } catch (e) {
         LogMessage("Could't append ICNS chunk", e);
         return null;
@@ -231,7 +267,7 @@ export function createICNS(input: Buffer, scalingAlgorithm: number, numOfColors:
         return null;
     }
     // All available chunk types
-    const icnsChunks: Array<ICNSChunkParams> = [
+    const icnsChunks: IICNSChunkParams[] = [
         { Type: "ic10", Size: 1024, Info: "512x512@2" },
         { Type: "ic09", Size: 512,  Info: "512x512  " },
         { Type: "ic14", Size: 512,  Info: "256x256@2" },
@@ -242,10 +278,10 @@ export function createICNS(input: Buffer, scalingAlgorithm: number, numOfColors:
         // PNG isn't supported for types il32 and is32. If used the Finder will display a scrambled
         // image in list view. However, the Preview app displays them correctly. The alternative
         // types icp5 and icp4 (with PNG support) also don't work in Finder but again in Preview.
-        //{ Type: "il32", Size: 32,   Info: "32x32    " },
-        //{ Type: "is32", Size: 16,   Info: "16       " },
-        //{ Type: "icp5", Size: 32,   Info: "32x32    " },
-        //{ Type: "icp4", Size: 16,   Info: "16       " },
+        // { Type: "il32", Size: 32,   Info: "32x32    " },
+        // { Type: "is32", Size: 16,   Info: "16       " },
+        // { Type: "icp5", Size: 32,   Info: "32x32    " },
+        // { Type: "icp4", Size: 16,   Info: "16       " },
         { Type: "ic11", Size: 32,   Info: "16x16@2  " },
     ];
     // ICNS header, "icns" + length of file (written later)
@@ -266,7 +302,6 @@ export function createICNS(input: Buffer, scalingAlgorithm: number, numOfColors:
     return outBuffer;
 }
 
-
 ////////////////////////////////////////
 // Microsoft ICO
 ////////////////////////////////////////
@@ -278,11 +313,11 @@ export function createICNS(input: Buffer, scalingAlgorithm: number, numOfColors:
  * @returns Buffer The ICO header (file level).
  */
 function getICONDIR(numOfImages: number): Buffer {
-	const iconDir: Buffer = Buffer.alloc(6);
-	iconDir.writeUInt16LE(0, 0);            // Reserved. Must always be 0.
-	iconDir.writeUInt16LE(1, 2);            // Specifies image type: 1 for icon (.ICO) image, 2 for cursor (.CUR) image. Other values are invalid.
-	iconDir.writeUInt16LE(numOfImages, 4);  // Specifies number of images in the file.
-	return iconDir;
+    const iconDir: Buffer = Buffer.alloc(6);
+    iconDir.writeUInt16LE(0, 0);            // Reserved. Must always be 0.
+    iconDir.writeUInt16LE(1, 2);            // Specifies image type: 1 for icon (.ICO) image, 2 for cursor (.CUR) image. Other values are invalid.
+    iconDir.writeUInt16LE(numOfImages, 4);  // Specifies number of images in the file.
+    return iconDir;
 }
 
 /**
@@ -294,20 +329,20 @@ function getICONDIR(numOfImages: number): Buffer {
  * @returns Buffer The header for this icon.
  */
 function getICONDIRENTRY(image: Image, offset: number, forPNG: boolean): Buffer {
-	const iconDirEntry: Buffer = Buffer.alloc(16);
-	const width: number = image.width >= 256 ? 0 : image.width;
-	const height: number = image.height >= 256 ? 0 : image.height;
-	const bitsPerPixel: number = 32;              // UPNG.toRGBA8 always gives 32 bpp
-	const imageSize: number = image.data.length + (forPNG ? 0 : 40);  // Add BITMAPINFOHEADER size depending on output format
-	iconDirEntry.writeUInt8(width, 0);            // Specifies image width in pixels. Can be any number between 0 and 255. Value 0 means image width is 256 pixels.
-	iconDirEntry.writeUInt8(height, 1);           // Specifies image height in pixels. Can be any number between 0 and 255. Value 0 means image height is 256 pixels.
-	iconDirEntry.writeUInt8(0, 2);                // Specifies number of colors in the color palette. Should be 0 if the image does not use a color palette.
-	iconDirEntry.writeUInt8(0, 3);                // Reserved. Should be 0.
-	iconDirEntry.writeUInt16LE(0, 4);             // In ICO format: Specifies color planes. Should be 0 or 1.
-	iconDirEntry.writeUInt16LE(bitsPerPixel, 6);  // In ICO format: Specifies bits per pixel.
-	iconDirEntry.writeUInt32LE(imageSize, 8);     // Specifies the size of the image's data in bytes
-	iconDirEntry.writeUInt32LE(offset, 12);       // Specifies the offset of BMP or PNG data from the beginning of the ICO/CUR file.
-	return iconDirEntry;
+    const iconDirEntry: Buffer = Buffer.alloc(16);
+    const width: number = image.width >= 256 ? 0 : image.width;
+    const height: number = image.height >= 256 ? 0 : image.height;
+    const bitsPerPixel: number = 32;              // UPNG.toRGBA8 always gives 32 bpp
+    const imageSize: number = image.data.length + (forPNG ? 0 : 40);  // Add BITMAPINFOHEADER size depending on output format
+    iconDirEntry.writeUInt8(width, 0);            // Specifies image width in pixels. Can be any number between 0 and 255. Value 0 means image width is 256 pixels.
+    iconDirEntry.writeUInt8(height, 1);           // Specifies image height in pixels. Can be any number between 0 and 255. Value 0 means image height is 256 pixels.
+    iconDirEntry.writeUInt8(0, 2);                // Specifies number of colors in the color palette. Should be 0 if the image does not use a color palette.
+    iconDirEntry.writeUInt8(0, 3);                // Reserved. Should be 0.
+    iconDirEntry.writeUInt16LE(0, 4);             // In ICO format: Specifies color planes. Should be 0 or 1.
+    iconDirEntry.writeUInt16LE(bitsPerPixel, 6);  // In ICO format: Specifies bits per pixel.
+    iconDirEntry.writeUInt32LE(imageSize, 8);     // Specifies the size of the image's data in bytes
+    iconDirEntry.writeUInt32LE(offset, 12);       // Specifies the offset of BMP or PNG data from the beginning of the ICO/CUR file.
+    return iconDirEntry;
 }
 
 /**
@@ -362,8 +397,8 @@ function getDIB(image: Image): Buffer {
             DIB.writeUInt8(g, pos + 1);
             DIB.writeUInt8(r, pos + 2);
             DIB.writeUInt8(a, pos + 3);
-		}
-	}
+        }
+    }
     return DIB;
 }
 
@@ -376,7 +411,10 @@ function getDIB(image: Image): Buffer {
  * @param f A function to call on every pixel; the (x, y) position of the pixel
  *        and the index of the pixel in the bitmap buffer are passed to the function.
  */
-function scanImage(image: Image, x: number, y: number, w: number, h: number, f: Function): void {
+function scanImage(image: Image,
+                   x: number, y: number,
+                   w: number, h: number,
+                   f: (sx: number, sy: number, idx: number) => void): void {
     for (let _y = y; _y < (y + h); _y++) {
         for (let _x = x; _x < (x + w); _x++) {
             // tslint:disable-next-line:no-bitwise
@@ -400,11 +438,11 @@ function blit(source: Image, target: Image, x: number, y: number) {
         if ((x + sx >= 0) && (y + sy >= 0) && (target.width - x - sx > 0) && (target.height - y - sy > 0)) {
             // tslint:disable-next-line:no-bitwise
             const destIdx = (target.width * (y + sy) + (x + sx)) << 2;
-            //const destIdx = getPixelIndex(target, x + sx, y + sy);
+            // const destIdx = getPixelIndex(target, x + sx, y + sy);
             target.data[destIdx] = source.data[idx];
-            target.data[destIdx+1] = source.data[idx+1];
-            target.data[destIdx+2] = source.data[idx+2];
-            target.data[destIdx+3] = source.data[idx+3];
+            target.data[destIdx + 1] = source.data[idx + 1];
+            target.data[destIdx + 2] = source.data[idx + 2];
+            target.data[destIdx + 3] = source.data[idx + 3];
         }
     });
 }
@@ -415,12 +453,14 @@ function blit(source: Image, target: Image, x: number, y: number) {
  * @see resize.js, UPNG.js
  * @param input A raw buffer containing the complete source PNG file.
  * @param scalingAlgorithm One of the supported scaling algorithms for resizing.
- * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless, other values (<= 256) means lossy). Only used if "usePNG" is true.
+ * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless, other values (<= 256) means lossy).
+ *      Only used if "usePNG" is true.
  * @param usePNG Store each chunk in the generated output in either PNG or Windows BMP format.
- *        PNG as opposed to DIB is valid but older Windows versions may not be able to display it.
+ *      PNG as opposed to DIB is valid but older Windows versions may not be able to display it.
  * @returns A buffer which contains the binary data of the ICO file or null in case of an error.
  */
-export function createICO(input: Buffer, scalingAlgorithm: number, numOfColors: number, usePNG: boolean): Buffer | null {
+export function createICO(input: Buffer, scalingAlgorithm: number,
+                          numOfColors: number, usePNG: boolean): Buffer | null {
     // Source for all resizing actions
     let srcImage: Image | null = decodePNG(input);
     if (!srcImage) {
@@ -433,12 +473,12 @@ export function createICO(input: Buffer, scalingAlgorithm: number, numOfColors: 
         let blitY: number;
         if (srcImage.height > srcImage.width) {
             edgeLength = srcImage.height;
-            blitX = (srcImage.height-srcImage.width)/2;
+            blitX = (srcImage.height - srcImage.width) / 2;
             blitY = 0;
         } else {
             edgeLength = srcImage.width;
             blitX = 0;
-            blitY = (srcImage.width-srcImage.height)/2;
+            blitY = (srcImage.width - srcImage.height) / 2;
         }
         let alphaBackground: Image | null = {
             data: Buffer.alloc(edgeLength * edgeLength * 4, 0),
@@ -450,19 +490,22 @@ export function createICO(input: Buffer, scalingAlgorithm: number, numOfColors: 
         alphaBackground = null;
     }
     // All chunk sizes
-    const icoChunkSizes: Array<number> = [16, 32, 48, 256];
+    const icoChunkSizes: number[] = [16, 32, 48, 256];
     // An array which receives the directory header and all entry headers
-    const icoDirectory: Array<Buffer> = [];
+    const icoDirectory: Buffer[] = [];
     // Create and append directory header
     icoDirectory.push(getICONDIR(icoChunkSizes.length));
     // Temporary storge for all scaled PNG images
-    const icoChunkImages: Array<Buffer> = [];
+    const icoChunkImages: Buffer[] = [];
     // Initial offset for the first image
     let chunkOffset: number = icoDirectory[0].length + (icoChunkSizes.length * 16); // fixed length of ICONDIRENTRY is 16
     // Process each chunk
     for (const icoChunkSize of icoChunkSizes) {
         // Target rect for scaled image
-        const icoChunkRect = stretchRect(getRect(0, 0, srcImage.width, srcImage.height), getRect(0, 0, icoChunkSize, icoChunkSize));
+        const icoChunkRect = stretchRect(
+            getRect(0, 0, srcImage.width, srcImage.height),
+            getRect(0, 0, icoChunkSize, icoChunkSize),
+        );
         // Get scaled raw image
         const scaledRawImage: Image = {
             data: scaleToFit(srcImage, icoChunkRect, scalingAlgorithm),
@@ -472,7 +515,12 @@ export function createICO(input: Buffer, scalingAlgorithm: number, numOfColors: 
         // Store entry header, store image and get offset for next image
         icoDirectory.push(getICONDIRENTRY(scaledRawImage, chunkOffset, usePNG));
         if (usePNG) {
-            const encodedPNG: ArrayBuffer = UPNG.encode([scaledRawImage.data.buffer], icoChunkRect.Width, icoChunkRect.Height, (numOfColors < 0) ? 0 : ((numOfColors > MAX_COLORS) ? MAX_COLORS : numOfColors));
+            const encodedPNG: ArrayBuffer = UPNG.encode(
+                [scaledRawImage.data.buffer],
+                icoChunkRect.Width,
+                icoChunkRect.Height,
+                (numOfColors < 0) ? 0 : ((numOfColors > MAX_COLORS) ? MAX_COLORS : numOfColors),
+            );
             icoChunkImages.push(Buffer.from(encodedPNG));
             chunkOffset += encodedPNG.byteLength;
         } else {
@@ -487,7 +535,6 @@ export function createICO(input: Buffer, scalingAlgorithm: number, numOfColors: 
     return Buffer.concat(icoDirectory.concat(icoChunkImages));
 }
 
-
 ////////////////////////////////////////
 // Deprecated functions
 ////////////////////////////////////////
@@ -496,12 +543,13 @@ export function createICO(input: Buffer, scalingAlgorithm: number, numOfColors: 
  * Deprecated, see README.md.
  * @deprecated
  */
-export function PNG2ICNS(input: Buffer, scalingAlgorithm: number, printInfo: boolean, numOfColors: number): Buffer | null {
-    const oldLogger: Logger | undefined = Log;
+export function PNG2ICNS(input: Buffer, scalingAlgorithm: number,
+                         printInfo: boolean, numOfColors: number): Buffer | null {
+    const oldLogger: Logger | undefined = logFnc;
     let result: Buffer | null;
-    printInfo ? (Log = console.log) : (Log = undefined);
+    printInfo ? (logFnc = console.log) : (logFnc = undefined);
     result = createICNS(input, scalingAlgorithm, numOfColors);
-    Log = oldLogger;
+    logFnc = oldLogger;
     return result;
 }
 
@@ -509,12 +557,13 @@ export function PNG2ICNS(input: Buffer, scalingAlgorithm: number, printInfo: boo
  * Deprecated, see README.md.
  * @deprecated
  */
-export function PNG2ICO_PNG(input: Buffer, scalingAlgorithm: number, printInfo: boolean, numOfColors: number): Buffer | null {
-    const oldLogger: Logger | undefined = Log;
+export function PNG2ICO_PNG(input: Buffer, scalingAlgorithm: number,
+                            printInfo: boolean, numOfColors: number): Buffer | null {
+    const oldLogger: Logger | undefined = logFnc;
     let result: Buffer | null;
-    printInfo ? (Log = console.log) : (Log = undefined);
+    printInfo ? (logFnc = console.log) : (logFnc = undefined);
     result = createICO(input, scalingAlgorithm, numOfColors, true);
-    Log = oldLogger;
+    logFnc = oldLogger;
     return result;
 }
 
@@ -523,10 +572,10 @@ export function PNG2ICO_PNG(input: Buffer, scalingAlgorithm: number, printInfo: 
  * @deprecated
  */
 export function PNG2ICO_BMP(input: Buffer, scalingAlgorithm: number, printInfo: boolean): Buffer | null {
-    const oldLogger: Logger | undefined = Log;
+    const oldLogger: Logger | undefined = logFnc;
     let result: Buffer | null;
-    printInfo ? (Log = console.log) : (Log = undefined);
+    printInfo ? (logFnc = console.log) : (logFnc = undefined);
     result = createICO(input, scalingAlgorithm, 0, false);
-    Log = oldLogger;
+    logFnc = oldLogger;
     return result;
 }

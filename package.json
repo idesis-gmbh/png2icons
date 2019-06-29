@@ -21,7 +21,8 @@
   "contributors": [
     "Ivan Kutskir (http://www.photopea.com)",
     "Guyon Roche (https://github.com/guyonroche)",
-    "Oliver Moran (https://github.com/oliver-moran)"
+    "Oliver Moran (https://github.com/oliver-moran)",
+    "fiahfy (https://fiahfy.github.io/)"
   ],
   "repository": {
     "type": "git",
@@ -39,6 +40,7 @@
     "png2icons": "./png2icons-cli.js"
   },
   "files": [
+    "lib/icns-encoder.js",
     "lib/resize2.js",
     "lib/UPNG.js",
     "sample/sample.png",

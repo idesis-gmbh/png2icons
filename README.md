@@ -157,6 +157,8 @@ This module wouldn't have been possible without code from the following projects
 - Read/write PNG images: [UPNG.js](https://github.com/photopea/UPNG.js)
 - Image blitting: [Jimp](https://github.com/oliver-moran/jimp)
 - Image resizing: [ImageJS](https://github.com/guyonroche/imagejs)
+- PackBits compression: [packbits](https://fiahfy.github.io/)
+
 
 ## License
 

@@ -28,6 +28,13 @@ import * as UPNG from "./lib/UPNG";
  * https://github.com/oliver-moran/jimp/blob/05db5dfb9101585530ec508123ea4feab23df897/index.js
  * Copyright (c) 2014 Oliver Moran
  * The MIT License (MIT)
+ *
+ * Packbits compression for certain Apple ICNS icon types:
+ * https://github.com/fiahfy/packbits
+ * and hints from
+ * https://github.com/fiahfy/packbits/issues/1
+ * Copyright (c) 2018 fiahfy, https://fiahfy.github.io/
+ * The MIT License (MIT)
  */
 
 ////////////////////////////////////////

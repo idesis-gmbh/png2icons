@@ -83,18 +83,3 @@ export declare function createICNS(input: Buffer, scalingAlgorithm: number, numO
  * @returns A buffer which contains the binary data of the ICO file or null in case of an error.
  */
 export declare function createICO(input: Buffer, scalingAlgorithm: number, numOfColors: number, usePNG: boolean): Buffer | null;
-/**
- * Deprecated, see README.md.
- * @deprecated
- */
-export declare function PNG2ICNS(input: Buffer, scalingAlgorithm: number, printInfo: boolean, numOfColors: number): Buffer | null;
-/**
- * Deprecated, see README.md.
- * @deprecated
- */
-export declare function PNG2ICO_PNG(input: Buffer, scalingAlgorithm: number, printInfo: boolean, numOfColors: number): Buffer | null;
-/**
- * Deprecated, see README.md.
- * @deprecated
- */
-export declare function PNG2ICO_BMP(input: Buffer, scalingAlgorithm: number, printInfo: boolean): Buffer | null;

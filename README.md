@@ -1,7 +1,5 @@
 # png2icons
 
-***Note: v.1.0.0 introduced a breaking API change. Please see "Deprecated API" below.***
-
 **png2icons generates [Apple ICNS](https://en.wikipedia.org/wiki/Apple_Icon_Image_format) 
 and [Microsoft ICO](https://en.wikipedia.org/wiki/ICO_(file_format)) files from PNG 
 files.**
@@ -137,54 +135,6 @@ png2icons.setLogger(null);
 output = png2icons.createICO(input, png2icons.BICUBIC, 0, false);
 fs.writeFileSync("icon_bmp.ico", output);
 ```
-
-
-### Deprecated API
-
-The (now deprecated) functions of v. 0.9.1 are still available for backwards
-compatibility but you should use the current API. These functions will be removed 
-in future releases. These deprecated functions have the old names and still 
-contain the boolean parameter `printInfo`:
-
-```
-function PNG2ICNS(input, scalingAlgorithm, printInfo, numOfColors)
-function PNG2ICO_PNG(input, scalingAlgorithm, printInfo, numOfColors)
-function PNG2ICO_BMP(input, scalingAlgorithm, printInfo)
-```
-
-The boolean parameter `printInfo` enables/disables logging of info strings to 
-the *console* during processing.
-
-If you've already set a custom logging function with `setLogger` then this will
-be kept, that is, setting `printInfo` to `true` or `false` has no influence on 
-the custom logging function. Settting `printInfo` to `true` will always log to
-the *console*, it won't use an already exsting supplied function.
-
-**Example:**
-
-```javascript
-var png2icons = require("png2icons");
-var fs = require("fs");
-
-var input = fs.readFileSync("sample.png");
-
-// Apple ICNS with bilinear interpolation and no color reduction.
-// Print info messages.
-var output = png2icons.PNG2ICNS(input, png2icons.BILINEAR, true, 0);
-if (output) {
-    fs.writeFileSync("icon.icns", output);
-}
-
-// Microsoft ICO using PNG icons with Bezier interpolation and 
-// reduction to 20 colors. Print info messages.
-output = png2icons.PNG2ICO_PNG(input, png2icons.BEZIER, true, 20);
-fs.writeFileSync("icon.ico", output);
-
-// Microsoft ICO using BMP icons with bicubic interpolation.
-// Don't print info messages.
-output = png2icons.PNG2ICO_BMP(input, png2icons.BICUBIC, false);
-fs.writeFileSync("icon_bmp.ico", output);
-````
 
 
 ## Development

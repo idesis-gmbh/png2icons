@@ -531,51 +531,6 @@ export function createICO(input: Buffer, scalingAlgorithm: number,
         }
         LogMessage(`wrote ${usePNG ? "png" : "bmp"} icon for size ${icoChunkSize}`);
     }
-    LogMessage(`done`);
-    return Buffer.concat(icoDirectory.concat(icoChunkImages));
-}
-
-////////////////////////////////////////
-// Deprecated functions
-////////////////////////////////////////
-
-/**
- * Deprecated, see README.md.
- * @deprecated
- */
-export function PNG2ICNS(input: Buffer, scalingAlgorithm: number,
-                         printInfo: boolean, numOfColors: number): Buffer | null {
-    const oldLogger: Logger | undefined = logFnc;
-    let result: Buffer | null;
-    printInfo ? (logFnc = console.log) : (logFnc = undefined);
-    result = createICNS(input, scalingAlgorithm, numOfColors);
-    logFnc = oldLogger;
-    return result;
-}
-
-/**
- * Deprecated, see README.md.
- * @deprecated
- */
-export function PNG2ICO_PNG(input: Buffer, scalingAlgorithm: number,
-                            printInfo: boolean, numOfColors: number): Buffer | null {
-    const oldLogger: Logger | undefined = logFnc;
-    let result: Buffer | null;
-    printInfo ? (logFnc = console.log) : (logFnc = undefined);
-    result = createICO(input, scalingAlgorithm, numOfColors, true);
-    logFnc = oldLogger;
-    return result;
-}
-
-/**
- * Deprecated, see README.md.
- * @deprecated
- */
-export function PNG2ICO_BMP(input: Buffer, scalingAlgorithm: number, printInfo: boolean): Buffer | null {
-    const oldLogger: Logger | undefined = logFnc;
-    let result: Buffer | null;
-    printInfo ? (logFnc = console.log) : (logFnc = undefined);
-    result = createICO(input, scalingAlgorithm, 0, false);
-    logFnc = oldLogger;
-    return result;
+    LogMessage(`done`, totalLength);
+    return Buffer.concat(icoDirectory.concat(icoChunkImages), totalLength);
 }

@@ -510,6 +510,8 @@ export function createICO(input: Buffer, scalingAlgorithm: number,
     const icoDirectory: Buffer[] = [];
     // Create and append directory header
     icoDirectory.push(getICONDIR(icoChunkSizes.length));
+    // Final total length of all buffers.
+    let totalLength: number = icoDirectory[0].length; // ICONDIR header
     // Temporary storge for all scaled PNG images
     const icoChunkImages: Buffer[] = [];
     // Initial offset for the first image
@@ -528,7 +530,9 @@ export function createICO(input: Buffer, scalingAlgorithm: number,
             width: icoChunkRect.Width,
         };
         // Store entry header, store image and get offset for next image
-        icoDirectory.push(getICONDIRENTRY(scaledRawImage, chunkOffset, usePNG));
+        const iconDirEntry: Buffer = getICONDIRENTRY(scaledRawImage, chunkOffset, usePNG);
+        totalLength += iconDirEntry.byteLength;
+        icoDirectory.push(iconDirEntry);
         if (usePNG) {
             const encodedPNG: ArrayBuffer = UPNG.encode(
                 [scaledRawImage.data.buffer],
@@ -539,15 +543,17 @@ export function createICO(input: Buffer, scalingAlgorithm: number,
                 true,
             );
             icoChunkImages.push(Buffer.from(encodedPNG));
+            totalLength += encodedPNG.byteLength;
             chunkOffset += encodedPNG.byteLength;
         } else {
             const bmpInfoHeader = getBITMAPINFOHEADER(scaledRawImage);
             const DIB = getDIB(scaledRawImage);
+            totalLength += bmpInfoHeader.length + DIB.length;
             icoChunkImages.push(bmpInfoHeader, DIB);
             chunkOffset += (bmpInfoHeader.length + DIB.length);
         }
         LogMessage(`wrote ${usePNG ? "png" : "bmp"} icon for size ${icoChunkSize}`);
     }
-    LogMessage(`done`, totalLength);
+    LogMessage(`done`);
     return Buffer.concat(icoDirectory.concat(icoChunkImages), totalLength);
 }

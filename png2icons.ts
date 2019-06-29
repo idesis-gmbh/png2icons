@@ -1,3 +1,4 @@
+import { encode as encodeWithPackBitsForICNS } from "./lib/icns-encoder";
 import { Image } from "./lib/Image";
 import * as Resize from "./lib/resize2";
 import * as UPNG from "./lib/UPNG";
@@ -190,6 +191,23 @@ function scaleToFit(srcImage: Image, destRect: IRect, scalingAlgorithm: number):
 }
 
 /**
+ * Extract a single channel of an image with n bytes per pixel, e. g. in RGBA format.
+ * @param image Input image.
+ * @param bpp Number of bytes per pixel.
+ * @param channelIndex Position of the channel byte in the <bpp>-value for each pixel.
+ * @returns x
+ */
+function extractChannel(image: Uint8Array, bpp: number, channelIndex: number): Buffer {
+    const channel: Buffer = Buffer.alloc(image.length / bpp);
+    const length: number = image.length;
+    let outPos: number = 0;
+    for (let i = channelIndex; i < length; i = i + 4) {
+        channel.writeUInt8(image[i], outPos++);
+    }
+    return channel;
+}
+
+/**
  * Create an image form a PNG.
  * @param input A buffer containing the raw PNG data/file.
  * @returns Image An image containing the raw bitmap and the image dimensions.
@@ -215,12 +233,56 @@ function decodePNG(input: Buffer): Image | null {
 ////////////////////////////////////////
 
 /**
+ * Icon format
+ */
+enum IconFormat {
+    /**
+     * Compression type PNG for icon.
+     */
+    PNG,
+    /**
+     * Compression type PackBits for icon.
+     */
+    PackBits,
+}
+
+/**
  * Data for one icon chunk.
  */
 interface IICNSChunkParams {
-    Type: string;
+    /**
+     * Magic number for icon type.
+     */
+    OSType: string;
+    /**
+     * (Compression) Type for icon.
+     */
+    Format: IconFormat;
+    /**
+     * Icon output size.
+     */
     Size: number;
+    /**
+     * Info for logging.
+     */
     Info: string;
+}
+
+/**
+ * Convert an RGBA image into a PackBits compressed ARBG image (with header).
+ * @param image Input image in RGBA format.
+ * @param width Width of input image in pixels.
+ * @param height Height of input image in pixels.
+ * @returns Output image in ARGB format, compressed with PackBits and preceeded by the appropriate header.
+ */
+function encodeIconWithPackBits(image: Buffer): Uint8Array {
+    const header: Buffer = Buffer.alloc(4);
+    header.write("ARGB", 0, 4, "ascii");
+    const R: Buffer = encodeWithPackBitsForICNS(extractChannel(image, 4, 0));
+    const G: Buffer = encodeWithPackBitsForICNS(extractChannel(image, 4, 1));
+    const B: Buffer = encodeWithPackBitsForICNS(extractChannel(image, 4, 2));
+    const A: Buffer = encodeWithPackBitsForICNS(extractChannel(image, 4, 3));
+    return Buffer.concat([header, A, R, G, B], header.length + A.length + R.length + G.length + B.length);
 }
 
 /**
@@ -229,13 +291,13 @@ interface IICNSChunkParams {
  * @param chunkParams Object which configures the icon chunk generation.
  * @param srcImage The source image.
  * @param scalingAlgorithm Scaling method (one of the constants NEAREST_NEIGHBOR, BILINEAR, ...).
- * @param outBuffer The buffer where the generated chunk *shall be* appended to.
  * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless, other values (> 0) means lossy).
+ * @param outBuffer The buffer where the generated chunk *shall be* appended to.
  * @returns The buffer where the generated chunk *has been* appended to (outbuffer+icon chunk)
  *      or null if an error occured.
  */
 function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scalingAlgorithm: number,
-                         outBuffer: Buffer, numOfColors: number): Buffer | null {
+                         numOfColors: number, outBuffer: Buffer): Buffer | null {
     try {
         // Fit source rect to target rect
         const icnsChunkRect: IRect = stretchRect(
@@ -245,21 +307,31 @@ function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scaling
         );
         // Scale image
         const scaledRawData: Uint8Array = scaleToFit(srcImage, icnsChunkRect, scalingAlgorithm);
-        const encodedPNG: ArrayBuffer = UPNG.encode(
-            [scaledRawData.buffer],
-            icnsChunkRect.Width,
-            icnsChunkRect.Height,
-            numOfColors,
+        // Icon buffer
+        let encodedIcon: ArrayBuffer;
+        // Header bytes or every icon
+        const iconHeader: Buffer = Buffer.alloc(8);
+        // Write icon header, eg 'ic10' + (length of icon + icon header length)
+        iconHeader.write(chunkParams.OSType, 0);
+        if (chunkParams.Format === IconFormat.PNG) {
+            encodedIcon = UPNG.encode(
+                [scaledRawData.buffer],
+                icnsChunkRect.Width,
+                icnsChunkRect.Height,
+                numOfColors,
                 [],
                 true,
-        );
-        // Icon header, eg 'ic10' + (length of icon + icon header length)
-        const iconHeader: Buffer = Buffer.alloc(8, 0);
-        iconHeader.write(chunkParams.Type, 0);
-        iconHeader.writeUInt32BE(encodedPNG.byteLength + 8, 4);
+            );
+        } else if (chunkParams.Format === IconFormat.PackBits) {
+            encodedIcon = encodeIconWithPackBits(Buffer.from(scaledRawData.buffer));
+        } else {
+            throw new Error("Unknown format for icon (must be PNG or PackBits)");
+        }
+        // Size of chunk = encoded icon size + icon header length
+        iconHeader.writeUInt32BE(encodedIcon.byteLength + 8, 4);
         return Buffer.concat(
-            [outBuffer, iconHeader, Buffer.from(encodedPNG)],
-            outBuffer.length + iconHeader.length + encodedPNG.byteLength,
+            [outBuffer, iconHeader, Buffer.from(encodedIcon)],
+            outBuffer.length + iconHeader.length + encodedIcon.byteLength,
         );
     } catch (e) {
         LogMessage("Could't append ICNS chunk", e);
@@ -283,21 +355,33 @@ export function createICNS(input: Buffer, scalingAlgorithm: number, numOfColors:
     }
     // All available chunk types
     const icnsChunks: IICNSChunkParams[] = [
-        { Type: "ic10", Size: 1024, Info: "512x512@2" },
-        { Type: "ic09", Size: 512,  Info: "512x512  " },
-        { Type: "ic14", Size: 512,  Info: "256x256@2" },
-        { Type: "ic08", Size: 256,  Info: "256x256  " },
-        { Type: "ic13", Size: 256,  Info: "128x128@2" },
-        { Type: "ic07", Size: 128,  Info: "128x128  " },
-        { Type: "ic12", Size: 64,   Info: "32x32@2  " },
-        // PNG isn't supported for types il32 and is32. If used the Finder will display a scrambled
-        // image in list view. However, the Preview app displays them correctly. The alternative
-        // types icp5 and icp4 (with PNG support) also don't work in Finder but again in Preview.
-        // { Type: "il32", Size: 32,   Info: "32x32    " },
-        // { Type: "is32", Size: 16,   Info: "16       " },
-        // { Type: "icp5", Size: 32,   Info: "32x32    " },
-        // { Type: "icp4", Size: 16,   Info: "16       " },
-        { Type: "ic11", Size: 32,   Info: "16x16@2  " },
+        // Note: Strange enough, but the order of the different chunks in the output file
+        // seems to be relevant. If the ic04 and ic05 packbits icons are placed, for example,
+        // at the end of the file the Finder and the Preview app are unable to display them
+        // correctly. The position doesn't seem to have an impact for PNG encoded icons, only
+        // for packbits compressed icons. ic04 and ic05 are supported only on versions 10.14
+        // and newer but they don't seem to have a negative impact on older versions.
+        // The following order is the same of that created by iconutil on 10.14.
+        { OSType: "ic12", Format: IconFormat.PNG,      Size: 64,   Info: "32x32@2  " },
+        { OSType: "ic07", Format: IconFormat.PNG,      Size: 128,  Info: "128x128  " },
+        { OSType: "ic13", Format: IconFormat.PNG,      Size: 256,  Info: "128x128@2" },
+        { OSType: "ic08", Format: IconFormat.PNG,      Size: 256,  Info: "256x256  " },
+        { OSType: "ic04", Format: IconFormat.PackBits, Size: 16,   Info: "16x16    " },
+        { OSType: "ic14", Format: IconFormat.PNG,      Size: 512,  Info: "256x256@2" },
+        { OSType: "ic09", Format: IconFormat.PNG,      Size: 512,  Info: "512x512  " },
+        { OSType: "ic05", Format: IconFormat.PackBits, Size: 32,   Info: "32x32    " },
+        { OSType: "ic10", Format: IconFormat.PNG,      Size: 1024, Info: "512x512@2" },
+        { OSType: "ic11", Format: IconFormat.PNG,      Size: 32,   Info: "16x16@2  " },
+
+        // Getting il32 and is32 to work failed. Maybe a combination of PackBits compression
+        // and/or the position inside the generated file.
+        // { OSType: "il32", Format: IconFormat.PackBits, Size: 32,   Info: "32x32    " },
+        // { OSType: "is32", Format: IconFormat.PackBits, Size: 16,   Info: "16x16    " },
+        // icp5 and icp4 would be an alternative and the Preview app displays them correctly
+        // but they don't work in Finder. They also seem to be unsupported in older
+        // versions (e. g. 10.12).
+        // { OSType: "icp5", Format: IconFormat.PNG,     Size: 32,   Info: "32x32    " },
+        // { OSType: "icp4", Format: IconFormat.PNG,     Size: 16,   Info: "16x16    " },
     ];
     // ICNS header, "icns" + length of file (written later)
     let outBuffer: Buffer | null = Buffer.alloc(8, 0);
@@ -305,11 +389,11 @@ export function createICNS(input: Buffer, scalingAlgorithm: number, numOfColors:
     // Append all icon chunks
     const nOfColors: number = (numOfColors < 0) ? 0 : ((numOfColors > MAX_COLORS) ? MAX_COLORS : numOfColors);
     for (const chunkParams of icnsChunks) {
-        outBuffer = appendIcnsChunk(chunkParams, srcImage, scalingAlgorithm, outBuffer, nOfColors);
+        outBuffer = appendIcnsChunk(chunkParams, srcImage, scalingAlgorithm, nOfColors, outBuffer);
         if (!outBuffer) {
             return null;
         }
-        LogMessage(`wrote type ${chunkParams.Type} for size ${chunkParams.Info} with ${chunkParams.Size} pixels`);
+        LogMessage(`wrote type ${chunkParams.OSType} for size ${chunkParams.Info} with ${chunkParams.Size} pixels`);
     }
     // Write total file size at offset 4 of output and return final result
     outBuffer.writeUInt32BE(outBuffer.length, 4);

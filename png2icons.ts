@@ -237,6 +237,8 @@ function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scaling
             icnsChunkRect.Width,
             icnsChunkRect.Height,
             numOfColors,
+                [],
+                true,
         );
         // Icon header, eg 'ic10' + (length of icon + icon header length)
         const iconHeader: Buffer = Buffer.alloc(8, 0);
@@ -520,6 +522,8 @@ export function createICO(input: Buffer, scalingAlgorithm: number,
                 icoChunkRect.Width,
                 icoChunkRect.Height,
                 (numOfColors < 0) ? 0 : ((numOfColors > MAX_COLORS) ? MAX_COLORS : numOfColors),
+                [],
+                true,
             );
             icoChunkImages.push(Buffer.from(encodedPNG));
             chunkOffset += encodedPNG.byteLength;

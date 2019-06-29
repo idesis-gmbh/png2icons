@@ -21,6 +21,6 @@ export declare interface UPNGImage {
     data: ArrayBuffer;
 }
 
-export declare function encode(rgba: ArrayBuffer[], width: number, height: number, cnum: number, dels?: number[]): ArrayBuffer;
+export declare function encode(rgba: ArrayBuffer[], width: number, height: number, cnum: number, dels: number[], forbidPlte?: boolean): ArrayBuffer;
 export declare function decode(buffer: ArrayBuffer): UPNGImage;
 export declare function toRGBA8(img: UPNGImage): ArrayBuffer[];

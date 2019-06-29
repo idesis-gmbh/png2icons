@@ -48,11 +48,11 @@
   ],
   "types": "png2icons.d.ts",
   "dependencies": {
-    "pako": "1.0.6"
+    "pako": "1.0.10"
   },
   "devDependencies": {
-    "typescript": "2.9.2",
-    "tslint": "5.11.0",
+    "typescript": "3.5.2",
+    "tslint": "5.18.0",
     "@types/node": "*"
   },
   "scripts": {

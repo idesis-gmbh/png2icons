@@ -102,9 +102,13 @@ export const HERMITE = 4;
  * Simple rectangle.
  */
 interface IRect {
+    // tslint:disable-next-line: completed-docs
     Left: number;
+    // tslint:disable-next-line: completed-docs
     Top: number;
+    // tslint:disable-next-line: completed-docs
     Width: number;
+    // tslint:disable-next-line: completed-docs
     Height: number;
 }
 
@@ -194,7 +198,7 @@ function decodePNG(input: Buffer): Image | null {
             width: PNG.width,
         };
     } catch (e) {
-        LogMessage("Couldn't decode PNG", e);
+        LogMessage("Couldn't decode PNG:", e);
         return null;
     }
 }
@@ -226,11 +230,13 @@ interface IICNSChunkParams {
 function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scalingAlgorithm: number,
                          outBuffer: Buffer, numOfColors: number): Buffer | null {
     try {
+        // Fit source rect to target rect
         const icnsChunkRect: IRect = stretchRect(
             getRect(0, 0, srcImage.width, srcImage.height),
             getRect(0, 0, chunkParams.Size,
             chunkParams.Size),
         );
+        // Scale image
         const scaledRawData: Uint8Array = scaleToFit(srcImage, icnsChunkRect, scalingAlgorithm);
         const encodedPNG: ArrayBuffer = UPNG.encode(
             [scaledRawData.buffer],
@@ -355,7 +361,7 @@ function getICONDIRENTRY(image: Image, offset: number, forPNG: boolean): Buffer 
  */
 function getBITMAPINFOHEADER(image: Image): Buffer {
     const buffer: Buffer = Buffer.alloc(40);
-    // Always needs a doubled height (??).
+    // Height must be doubled because of alpha channel.
     const height: number = image.height * 2;
     const bitsPerPixel: number = 32;              // UPNG.toRGBA8 always gives 32 bpp
     buffer.writeUInt32LE(40, 0);                  // Size of this header (40 bytes)

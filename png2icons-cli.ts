@@ -134,9 +134,21 @@ if (argc === 7) {
  * Describes a task object to be executed.
  */
 interface ITask {
+    /**
+     * Output format.
+     */
     Format: string;
+    /**
+     * Use PNG as file format for generated icons.
+     */
     UsePNG: boolean;
+    /**
+     * File extension.
+     */
     FileExt: string;
+    /**
+     * Converter function to be called.
+     */
     ConverterFnc: (input: Buffer, scalingAlgorithm: number, numOfColors: number, usePNG?: boolean) => Buffer | null;
 }
 

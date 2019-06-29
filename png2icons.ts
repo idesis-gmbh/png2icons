@@ -505,7 +505,7 @@ export function createICO(input: Buffer, scalingAlgorithm: number,
         alphaBackground = null;
     }
     // All chunk sizes
-    const icoChunkSizes: number[] = [16, 32, 48, 256];
+    const icoChunkSizes: number[] = [16, 24, 32, 48, 64, 72, 96, 128, 256];
     // An array which receives the directory header and all entry headers
     const icoDirectory: Buffer[] = [];
     // Create and append directory header

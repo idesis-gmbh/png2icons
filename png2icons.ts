@@ -290,8 +290,8 @@ function encodeIconWithPackBits(image: Buffer, withAlphaChannel: boolean): Uint8
     if (withAlphaChannel) {
         const header: Buffer = Buffer.alloc(4);
         header.write("ARGB", 0, 4, "ascii");
-    const A: Buffer = encodeWithPackBitsForICNS(extractChannel(image, 4, 3));
-    return Buffer.concat([header, A, R, G, B], header.length + A.length + R.length + G.length + B.length);
+        const A: Buffer = encodeWithPackBitsForICNS(extractChannel(image, 4, 3));
+        return Buffer.concat([header, A, R, G, B], header.length + A.length + R.length + G.length + B.length);
     } else {
         return Buffer.concat([R, G, B], R.length + G.length + B.length);
     }
@@ -315,7 +315,7 @@ function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scaling
         const icnsChunkRect: IRect = stretchRect(
             getRect(0, 0, srcImage.width, srcImage.height),
             getRect(0, 0, chunkParams.Size,
-            chunkParams.Size),
+                chunkParams.Size),
         );
         // Scale image
         const scaledRawData: Uint8Array = scaleToFit(srcImage, icnsChunkRect, scalingAlgorithm);
@@ -328,14 +328,14 @@ function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scaling
         // Write icon
         switch (chunkParams.Format) {
             case IconFormat.PNG:
-            encodedIcon = UPNG.encode(
-                [scaledRawData.buffer],
-                icnsChunkRect.Width,
-                icnsChunkRect.Height,
-                numOfColors,
-                [],
-                true,
-            );
+                    encodedIcon = UPNG.encode(
+                        [scaledRawData.buffer],
+                        icnsChunkRect.Width,
+                        icnsChunkRect.Height,
+                        numOfColors,
+                        [],
+                        true,
+                    );
                     break;
 
             case IconFormat.PackBitsARGB:
@@ -391,16 +391,16 @@ export function createICNS(input: Buffer, scalingAlgorithm: number, numOfColors:
         // they are simply ignored. Nevertheless png2icons uses is32 and il32 for better
         // support on older versions.
         // The following order is the same of that created by iconutil on 10.14.
-        { OSType: "ic12", Format: IconFormat.PNG,      Size: 64,   Info: "32x32@2  " },
-        { OSType: "ic07", Format: IconFormat.PNG,      Size: 128,  Info: "128x128  " },
-        { OSType: "ic13", Format: IconFormat.PNG,      Size: 256,  Info: "128x128@2" },
-        { OSType: "ic08", Format: IconFormat.PNG,      Size: 256,  Info: "256x256  " },
+        { OSType: "ic12", Format: IconFormat.PNG, Size: 64, Info: "32x32@2  " },
+        { OSType: "ic07", Format: IconFormat.PNG, Size: 128, Info: "128x128  " },
+        { OSType: "ic13", Format: IconFormat.PNG, Size: 256, Info: "128x128@2" },
+        { OSType: "ic08", Format: IconFormat.PNG, Size: 256, Info: "256x256  " },
         // { OSType: "ic04", Format: IconFormat.PackBitsARGB, Size: 16,   Info: "16x16    " },
-        { OSType: "ic14", Format: IconFormat.PNG,      Size: 512,  Info: "256x256@2" },
-        { OSType: "ic09", Format: IconFormat.PNG,      Size: 512,  Info: "512x512  " },
+        { OSType: "ic14", Format: IconFormat.PNG, Size: 512, Info: "256x256@2" },
+        { OSType: "ic09", Format: IconFormat.PNG, Size: 512, Info: "512x512  " },
         // { OSType: "ic05", Format: IconFormat.PackBitsARGB, Size: 32,   Info: "32x32    " },
-        { OSType: "ic10", Format: IconFormat.PNG,      Size: 1024, Info: "512x512@2" },
-        { OSType: "ic11", Format: IconFormat.PNG,      Size: 32,   Info: "16x16@2  " },
+        { OSType: "ic10", Format: IconFormat.PNG, Size: 1024, Info: "512x512@2" },
+        { OSType: "ic11", Format: IconFormat.PNG, Size: 32, Info: "16x16@2  " },
         // Important note:
         // The types il32 and is32 have to be Packbits encoded in RGB and they *need*
         // a *corresponding separate mask icon entry*. This mask contains an *uncompressed*
@@ -467,14 +467,16 @@ function getICONDIRENTRY(image: Image, offset: number, forPNG: boolean): Buffer 
     const width: number = image.width >= 256 ? 0 : image.width;
     const height: number = image.height >= 256 ? 0 : image.height;
     const bitsPerPixel: number = 32;              // UPNG.toRGBA8 always gives 32 bpp
-    const imageSize: number = image.data.length + (forPNG ? 0 : 40);  // Add BITMAPINFOHEADER size depending on output format
+    const padding = (image.width + (image.width % 32 ? 32 - image.width % 32 : 0)) * image.height / 8;
+    // Add BITMAPINFOHEADER size depending on output format
+    const size = (image.height * image.width * 4) + padding + (forPNG ? 0 : 40);
     iconDirEntry.writeUInt8(width, 0);            // Specifies image width in pixels. Can be any number between 0 and 255. Value 0 means image width is 256 pixels.
     iconDirEntry.writeUInt8(height, 1);           // Specifies image height in pixels. Can be any number between 0 and 255. Value 0 means image height is 256 pixels.
     iconDirEntry.writeUInt8(0, 2);                // Specifies number of colors in the color palette. Should be 0 if the image does not use a color palette.
     iconDirEntry.writeUInt8(0, 3);                // Reserved. Should be 0.
-    iconDirEntry.writeUInt16LE(0, 4);             // In ICO format: Specifies color planes. Should be 0 or 1.
+    iconDirEntry.writeUInt16LE(1, 4);             // In ICO format: Specifies color planes. Should be 0 or 1.
     iconDirEntry.writeUInt16LE(bitsPerPixel, 6);  // In ICO format: Specifies bits per pixel.
-    iconDirEntry.writeUInt32LE(imageSize, 8);     // Specifies the size of the image's data in bytes
+    iconDirEntry.writeUInt32LE(size, 8);          // Specifies the size of the image's data in bytes
     iconDirEntry.writeUInt32LE(offset, 12);       // Specifies the offset of BMP or PNG data from the beginning of the ICO/CUR file.
     return iconDirEntry;
 }
@@ -489,18 +491,20 @@ function getBITMAPINFOHEADER(image: Image): Buffer {
     const buffer: Buffer = Buffer.alloc(40);
     // Height must be doubled because of alpha channel.
     const height: number = image.height * 2;
-    const bitsPerPixel: number = 32;              // UPNG.toRGBA8 always gives 32 bpp
-    buffer.writeUInt32LE(40, 0);                  // Size of this header (40 bytes)
-    buffer.writeInt32LE(image.width, 4);          // Bitmap width in pixels
-    buffer.writeInt32LE(height, 8);               // Bitmap height in pixels
-    buffer.writeUInt16LE(1, 12);                  // Number of color planes (must be 1)
-    buffer.writeUInt16LE(bitsPerPixel, 14);       // Bits per pixel
-    buffer.writeUInt32LE(0, 16);                  // Compression method (here always 0).
-    buffer.writeUInt32LE(image.data.length, 20);  // Image size (image buffer).
-    buffer.writeInt32LE(3780, 24);                // Horizontal resolution of the image (pixels per meter, 3780 = 96 DPI).
-    buffer.writeInt32LE(3780, 28);                // Horizontal resolution of the image (pixels per meter, 3780 = 96 DPI).
-    buffer.writeUInt32LE(0, 32);                  // Number of colors in the color palette, or 0 to default to 2n
-    buffer.writeUInt32LE(0, 36);                  // Number of important colors used, or 0 when every color is important; generally ignored.
+    const padding = (image.width + (image.width % 32 ? 32 - image.width % 32 : 0)) * image.height / 8;
+    const imageSize = image.data.length + padding;
+    const bitsPerPixel: number = 32;         // UPNG.toRGBA8 always gives 32 bpp
+    buffer.writeUInt32LE(40, 0);             // Size of this header (40 bytes)
+    buffer.writeInt32LE(image.width, 4);     // Bitmap width in pixels
+    buffer.writeInt32LE(height, 8);          // Bitmap height in pixels
+    buffer.writeUInt16LE(1, 12);             // Number of color planes (must be 1)
+    buffer.writeUInt16LE(bitsPerPixel, 14);  // Bits per pixel
+    buffer.writeUInt32LE(0, 16);             // Compression method (here always 0).
+    buffer.writeUInt32LE(imageSize, 20);     // Image size (image buffer + padding).
+    buffer.writeInt32LE(3780, 24);           // Horizontal resolution of the image (pixels per meter, 3780 = 96 DPI).
+    buffer.writeInt32LE(3780, 28);           // Horizontal resolution of the image (pixels per meter, 3780 = 96 DPI).
+    buffer.writeUInt32LE(0, 32);             // Number of colors in the color palette, or 0 to default to 2n
+    buffer.writeUInt32LE(0, 36);             // Number of important colors used, or 0 when every color is important; generally ignored.
     return buffer;
 }
 
@@ -517,8 +521,9 @@ function getDIB(image: Image): Buffer {
     const columns: number = image.width * bytesPerPixel;
     const rows: number = image.height * columns;
     const end: number = rows - columns;
+    const padding = (image.width + (image.width % 32 ? 32 - image.width % 32 : 0)) * image.height / 8;
     const bitmap: Buffer = Buffer.from(image.data);
-    const DIB: Buffer = Buffer.alloc(image.data.length);
+    const DIB: Buffer = Buffer.alloc(image.data.length + padding).fill(255);
     for (let row = 0; row < rows; row += columns) {
         for (let col = 0; col < columns; col += bytesPerPixel) {
             let pos = row + col;
@@ -585,6 +590,10 @@ function blit(source: Image, target: Image, x: number, y: number) {
  * Create the Microsoft ICO format using PNG or Windows bitmaps for every icon.
  * @see https://en.wikipedia.org/wiki/ICO_(file_format)
  * @see resize.js, UPNG.js
+ * @see For the `padding` used in `getICONDIRENTRY`, `getBITMAPINFOHEADER` and `getDIB`
+ *      see https://github.com/fiahfy/ico. Without padding all icons could be displayed
+ *      without problems in all apps tested including Windows Explorer, only IrfanView
+ *      couldn't display any of the files.
  * @param input A raw buffer containing the complete source PNG file.
  * @param scalingAlgorithm One of the supported scaling algorithms for resizing.
  * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless, other values (<= 256) means lossy).

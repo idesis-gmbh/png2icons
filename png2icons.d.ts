@@ -81,6 +81,10 @@ export declare function createICNS(input: Buffer, scalingAlgorithm: number, numO
  * Create the Microsoft ICO format using PNG or Windows bitmaps for every icon.
  * @see https://en.wikipedia.org/wiki/ICO_(file_format)
  * @see resize.js, UPNG.js
+ * @see For the `padding` used in `getICONDIRENTRY`, `getBITMAPINFOHEADER` and `getDIB`
+ *      see https://github.com/fiahfy/ico. Without padding all icons could be displayed
+ *      without problems in all apps tested including Windows Explorer, only IrfanView
+ *      couldn't display any of the files.
  * @param input A raw buffer containing the complete source PNG file.
  * @param scalingAlgorithm One of the supported scaling algorithms for resizing.
  * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless, other values (<= 256) means lossy).

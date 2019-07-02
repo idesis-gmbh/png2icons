@@ -241,9 +241,17 @@ enum IconFormat {
      */
     PNG,
     /**
-     * Compression type PackBits for icon.
+     * Compression type ARGB PackBits (for icon types ic05 and ic04).
      */
-    PackBits,
+    PackBitsARGB,
+    /**
+     * Compression type RGB PackBits (for icon types il32 and is32).
+     */
+    PackBitsRGB,
+    /**
+     * (Uncompressed) alpha channel only (for icon masks l8mk and s8mk).
+     */
+    Alpha,
 }
 
 /**
@@ -269,20 +277,24 @@ interface IICNSChunkParams {
 }
 
 /**
- * Convert an RGBA image into a PackBits compressed ARBG image (with header).
+ * Convert an RGBA image into a PackBits compressed (A)RBG image, (with header).
  * @param image Input image in RGBA format.
- * @param width Width of input image in pixels.
- * @param height Height of input image in pixels.
- * @returns Output image in ARGB format, compressed with PackBits and preceeded by the appropriate header.
+ * @param withAlphaChannel Write out an alpha channel and the appropriate header.
+ * @returns Output image in (A)RGB format, compressed with PackBits and preceeded by
+ *          an "ARGB" header, if applicable.
  */
-function encodeIconWithPackBits(image: Buffer): Uint8Array {
-    const header: Buffer = Buffer.alloc(4);
-    header.write("ARGB", 0, 4, "ascii");
+function encodeIconWithPackBits(image: Buffer, withAlphaChannel: boolean): Uint8Array {
     const R: Buffer = encodeWithPackBitsForICNS(extractChannel(image, 4, 0));
     const G: Buffer = encodeWithPackBitsForICNS(extractChannel(image, 4, 1));
     const B: Buffer = encodeWithPackBitsForICNS(extractChannel(image, 4, 2));
+    if (withAlphaChannel) {
+        const header: Buffer = Buffer.alloc(4);
+        header.write("ARGB", 0, 4, "ascii");
     const A: Buffer = encodeWithPackBitsForICNS(extractChannel(image, 4, 3));
     return Buffer.concat([header, A, R, G, B], header.length + A.length + R.length + G.length + B.length);
+    } else {
+        return Buffer.concat([R, G, B], R.length + G.length + B.length);
+    }
 }
 
 /**
@@ -313,7 +325,9 @@ function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scaling
         const iconHeader: Buffer = Buffer.alloc(8);
         // Write icon header, eg 'ic10' + (length of icon + icon header length)
         iconHeader.write(chunkParams.OSType, 0);
-        if (chunkParams.Format === IconFormat.PNG) {
+        // Write icon
+        switch (chunkParams.Format) {
+            case IconFormat.PNG:
             encodedIcon = UPNG.encode(
                 [scaledRawData.buffer],
                 icnsChunkRect.Width,
@@ -322,10 +336,23 @@ function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scaling
                 [],
                 true,
             );
-        } else if (chunkParams.Format === IconFormat.PackBits) {
-            encodedIcon = encodeIconWithPackBits(Buffer.from(scaledRawData.buffer));
-        } else {
-            throw new Error("Unknown format for icon (must be PNG or PackBits)");
+                    break;
+
+            case IconFormat.PackBitsARGB:
+                encodedIcon = encodeIconWithPackBits(Buffer.from(scaledRawData.buffer), true);
+                break;
+
+            case IconFormat.PackBitsRGB:
+                encodedIcon = encodeIconWithPackBits(Buffer.from(scaledRawData.buffer), false);
+                break;
+
+            case IconFormat.Alpha:
+                // Aplpha channel is provided as is.
+                encodedIcon = extractChannel(Buffer.from(scaledRawData.buffer), 4, 3);
+                break;
+
+            default:
+                throw new Error("Unknown format for icon (must be PNG, PackBitsARGB, PackBitsRGB or Alpha)");
         }
         // Size of chunk = encoded icon size + icon header length
         iconHeader.writeUInt32BE(encodedIcon.byteLength + 8, 4);
@@ -356,27 +383,35 @@ export function createICNS(input: Buffer, scalingAlgorithm: number, numOfColors:
     // All available chunk types
     const icnsChunks: IICNSChunkParams[] = [
         // Note: Strange enough, but the order of the different chunks in the output file
-        // seems to be relevant. If the ic04 and ic05 packbits icons are placed, for example,
-        // at the end of the file the Finder and the Preview app are unable to display them
-        // correctly. The position doesn't seem to have an impact for PNG encoded icons, only
-        // for packbits compressed icons. ic04 and ic05 are supported only on versions 10.14
-        // and newer but they don't seem to have a negative impact on older versions.
+        // seems to be relevant if ic04 and ic05 packbits icons are used. For example, if
+        // they are placed at the end of the file the Finder and the Preview app are unable
+        // to display them correctly. The position doesn't seem to have an impact for PNG
+        // encoded icons, only for those two icons. ic04 and ic05 are supported on versions
+        // 10.14 and newer but they don't seem to have a negative impact on older versions,
+        // they are simply ignored. Nevertheless png2icons uses is32 and il32 for better
+        // support on older versions.
         // The following order is the same of that created by iconutil on 10.14.
         { OSType: "ic12", Format: IconFormat.PNG,      Size: 64,   Info: "32x32@2  " },
         { OSType: "ic07", Format: IconFormat.PNG,      Size: 128,  Info: "128x128  " },
         { OSType: "ic13", Format: IconFormat.PNG,      Size: 256,  Info: "128x128@2" },
         { OSType: "ic08", Format: IconFormat.PNG,      Size: 256,  Info: "256x256  " },
-        { OSType: "ic04", Format: IconFormat.PackBits, Size: 16,   Info: "16x16    " },
+        // { OSType: "ic04", Format: IconFormat.PackBitsARGB, Size: 16,   Info: "16x16    " },
         { OSType: "ic14", Format: IconFormat.PNG,      Size: 512,  Info: "256x256@2" },
         { OSType: "ic09", Format: IconFormat.PNG,      Size: 512,  Info: "512x512  " },
-        { OSType: "ic05", Format: IconFormat.PackBits, Size: 32,   Info: "32x32    " },
+        // { OSType: "ic05", Format: IconFormat.PackBitsARGB, Size: 32,   Info: "32x32    " },
         { OSType: "ic10", Format: IconFormat.PNG,      Size: 1024, Info: "512x512@2" },
         { OSType: "ic11", Format: IconFormat.PNG,      Size: 32,   Info: "16x16@2  " },
-
-        // Getting il32 and is32 to work failed. Maybe a combination of PackBits compression
-        // and/or the position inside the generated file.
-        // { OSType: "il32", Format: IconFormat.PackBits, Size: 32,   Info: "32x32    " },
-        // { OSType: "is32", Format: IconFormat.PackBits, Size: 16,   Info: "16x16    " },
+        // Important note:
+        // The types il32 and is32 have to be Packbits encoded in RGB and they *need*
+        // a *corresponding separate mask icon entry*. This mask contains an *uncompressed*
+        // alpha channel with the same image dimensions.
+        // Finding information on this was nearly impossible, the only source which finally
+        // led to the solution was this documentation from the stone ages:
+        // https://books.google.de/books?id=MTNUf464tHwC&pg=PA434&lpg=PA434&dq=mac+is32+icns&source=bl&ots=0fZ2g1qiia&sig=ACfU3U0uEMDeLkjeRL6CgD9_G_bPHasmEw&hl=de&sa=X&ved=2ahUKEwi_pYH0-5PjAhUGZ1AKHRx7CWMQ6AEwBnoECAkQAQ#v=onepage&q=mac%20is32%20icns&f=false
+        { OSType: "il32", Format: IconFormat.PackBitsRGB, Size: 32, Info: "32x32    " },
+        { OSType: "l8mk", Format: IconFormat.Alpha, Size: 32, Info: "32x32    " },
+        { OSType: "is32", Format: IconFormat.PackBitsRGB, Size: 16, Info: "16x16    " },
+        { OSType: "s8mk", Format: IconFormat.Alpha, Size: 16, Info: "16x16    " },
         // icp5 and icp4 would be an alternative and the Preview app displays them correctly
         // but they don't work in Finder. They also seem to be unsupported in older
         // versions (e. g. 10.12).

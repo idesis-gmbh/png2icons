@@ -175,9 +175,9 @@ function scaleToFit(srcImage: Image, destRect: IRect, scalingAlgorithm: number):
         width: destRect.Width,
     };
     if (scalingAlgorithm === NEAREST_NEIGHBOR) {
-        Resize.nearestNeighbor(srcImage, scaleResult, null);
+        Resize.nearestNeighbor(srcImage, scaleResult);
     } else if (scalingAlgorithm === BILINEAR) {
-        Resize.bilinearInterpolation(srcImage, scaleResult, null);
+        Resize.bilinearInterpolation(srcImage, scaleResult);
     } else if (scalingAlgorithm === BICUBIC) {
         Resize.bicubicInterpolation(srcImage, scaleResult, null);
     } else if (scalingAlgorithm === BEZIER) {

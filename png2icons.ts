@@ -169,6 +169,10 @@ function stretchRect(src: IRect, dst: IRect): IRect {
  * @returns Uint8Array The rescaled image.
  */
 function scaleToFit(srcImage: Image, destRect: IRect, scalingAlgorithm: number): Uint8Array {
+    // Nothing to do
+    if ((srcImage.width === destRect.Width) && (srcImage.height === destRect.Height)) {
+        return srcImage.data;
+    }
     const scaleResult: Image = {
         data: new Uint8Array(destRect.Width * destRect.Height * 4),
         height: destRect.Height,

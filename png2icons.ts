@@ -32,8 +32,10 @@ import * as UPNG from "./lib/UPNG";
  *
  * Packbits compression for certain Apple ICNS icon types:
  * https://github.com/fiahfy/packbits
- * and hints from
+ * Hints from
  * https://github.com/fiahfy/packbits/issues/1
+ * Hints for bitmap masks (method createBitmap) from
+ * https://github.com/fiahfy/ico/blob/master/src/index.js
  * Copyright (c) 2018 fiahfy, https://fiahfy.github.io/
  * The MIT License (MIT)
  */
@@ -199,7 +201,7 @@ function scaleToFit(srcImage: Image, destRect: IRect, scalingAlgorithm: number):
  * @param image Input image.
  * @param bpp Number of bytes per pixel.
  * @param channelIndex Position of the channel byte in the <bpp>-value for each pixel.
- * @returns x
+ * @returns The extracted channel.
  */
 function extractChannel(image: Uint8Array, bpp: number, channelIndex: number): Buffer {
     const channel: Buffer = Buffer.alloc(image.length / bpp);
@@ -310,7 +312,7 @@ function encodeIconWithPackBits(image: Buffer, withAlphaChannel: boolean): Uint8
  * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless, other values (> 0) means lossy).
  * @param outBuffer The buffer where the generated chunk *shall be* appended to.
  * @returns The buffer where the generated chunk *has been* appended to (outbuffer+icon chunk)
- *      or null if an error occured.
+ *          or null if an error occured.
  */
 function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scalingAlgorithm: number,
                          numOfColors: number, outBuffer: Buffer): Buffer | null {
@@ -445,6 +447,11 @@ export function createICNS(input: Buffer, scalingAlgorithm: number, numOfColors:
 ////////////////////////////////////////
 
 /**
+ * Length of Windows BMP header.
+ */
+const BITMAPINFOHEADERLENGTH: number = 40;
+
+/**
  * Get the directory header of an ICO file.
  * @see https://en.wikipedia.org/wiki/ICO_(file_format)
  * @param numOfImages Number of images the file will contain.
@@ -461,28 +468,36 @@ function getICONDIR(numOfImages: number): Buffer {
 /**
  * Get one entry for the directory header of an ICO file.
  * @see https://en.wikipedia.org/wiki/ICO_(file_format)
- * @param image The image for the icon chunk.
+ * @param imageSize Total length in bytes of the image for the icon chunk.
+ * @param width Width of the image for the icon chunk.
+ * @param height Height of the image for the icon chunk.
  * @param offset Offset of the image (file level).
- * @param forPNG True for icon chunk in PNG format, false for DIBs.
  * @returns Buffer The header for this icon.
  */
-function getICONDIRENTRY(image: Image, offset: number, forPNG: boolean): Buffer {
+function getICONDIRENTRY(imageSize: number, width: number, height: number, offset: number): Buffer {
     const iconDirEntry: Buffer = Buffer.alloc(16);
-    const width: number = image.width >= 256 ? 0 : image.width;
-    const height: number = image.height >= 256 ? 0 : image.height;
-    const bitsPerPixel: number = 32;              // UPNG.toRGBA8 always gives 32 bpp
-    const padding = (image.width + (image.width % 32 ? 32 - image.width % 32 : 0)) * image.height / 8;
-    // Add BITMAPINFOHEADER size depending on output format
-    const size = (image.height * image.width * 4) + padding + (forPNG ? 0 : 40);
+    width = width >= 256 ? 0 : width;
+    height = height >= 256 ? 0 : height;
     iconDirEntry.writeUInt8(width, 0);            // Specifies image width in pixels. Can be any number between 0 and 255. Value 0 means image width is 256 pixels.
     iconDirEntry.writeUInt8(height, 1);           // Specifies image height in pixels. Can be any number between 0 and 255. Value 0 means image height is 256 pixels.
     iconDirEntry.writeUInt8(0, 2);                // Specifies number of colors in the color palette. Should be 0 if the image does not use a color palette.
     iconDirEntry.writeUInt8(0, 3);                // Reserved. Should be 0.
     iconDirEntry.writeUInt16LE(1, 4);             // In ICO format: Specifies color planes. Should be 0 or 1.
-    iconDirEntry.writeUInt16LE(bitsPerPixel, 6);  // In ICO format: Specifies bits per pixel.
-    iconDirEntry.writeUInt32LE(size, 8);          // Specifies the size of the image's data in bytes
+    iconDirEntry.writeUInt16LE(32, 6);            // In ICO format: Specifies bits per pixel (UPNG.toRGBA8 always gives 4 bytes per pixel (RGBA)).
+    iconDirEntry.writeUInt32LE(imageSize, 8);     // Specifies the size of the image's data in bytes
     iconDirEntry.writeUInt32LE(offset, 12);       // Specifies the offset of BMP or PNG data from the beginning of the ICO/CUR file.
     return iconDirEntry;
+}
+
+/**
+ * Calculate the size of the mask for the alpha channel.
+ * @param bitmapWidth Width of the bitmap.
+ * @param bitmapHeight Height of the bitmap.
+ * @see https://github.com/fiahfy/ico.
+ * @returns The size of the mask in bytes.
+ */
+function getMaskSize(bitmapWidth: number, bitmapHeight: number): number {
+    return (bitmapWidth + (bitmapWidth % 32 ? 32 - bitmapWidth % 32 : 0)) * bitmapHeight / 8;
 }
 
 /**
@@ -492,28 +507,24 @@ function getICONDIRENTRY(image: Image, offset: number, forPNG: boolean): Buffer 
  * @returns Buffer The Bitmap Info Header for the entry.
  */
 function getBITMAPINFOHEADER(image: Image): Buffer {
-    const buffer: Buffer = Buffer.alloc(40);
-    // Height must be doubled because of alpha channel.
-    const height: number = image.height * 2;
-    const padding = (image.width + (image.width % 32 ? 32 - image.width % 32 : 0)) * image.height / 8;
-    const imageSize = image.data.length + padding;
-    const bitsPerPixel: number = 32;         // UPNG.toRGBA8 always gives 32 bpp
-    buffer.writeUInt32LE(40, 0);             // Size of this header (40 bytes)
-    buffer.writeInt32LE(image.width, 4);     // Bitmap width in pixels
-    buffer.writeInt32LE(height, 8);          // Bitmap height in pixels
-    buffer.writeUInt16LE(1, 12);             // Number of color planes (must be 1)
-    buffer.writeUInt16LE(bitsPerPixel, 14);  // Bits per pixel
-    buffer.writeUInt32LE(0, 16);             // Compression method (here always 0).
-    buffer.writeUInt32LE(imageSize, 20);     // Image size (image buffer + padding).
-    buffer.writeInt32LE(3780, 24);           // Horizontal resolution of the image (pixels per meter, 3780 = 96 DPI).
-    buffer.writeInt32LE(3780, 28);           // Horizontal resolution of the image (pixels per meter, 3780 = 96 DPI).
-    buffer.writeUInt32LE(0, 32);             // Number of colors in the color palette, or 0 to default to 2n
-    buffer.writeUInt32LE(0, 36);             // Number of important colors used, or 0 when every color is important; generally ignored.
+    const buffer: Buffer = Buffer.alloc(BITMAPINFOHEADERLENGTH);
+    const imageSize = image.data.length + getMaskSize(image.width, image.height);
+    buffer.writeUInt32LE(40, 0);               // Size of this header (40 bytes).
+    buffer.writeInt32LE(image.width, 4);       // Bitmap width in pixels.
+    buffer.writeInt32LE(image.height * 2, 8);  // Bitmap height in pixels (must be doubled because of alpha channel).
+    buffer.writeUInt16LE(1, 12);               // Number of color planes (must be 1).
+    buffer.writeUInt16LE(32, 14);              // Bits per pixel (UPNG.toRGBA8 always gives 4 bytes per pixel (RGBA)).
+    buffer.writeUInt32LE(0, 16);               // Compression method (here always 0).
+    buffer.writeUInt32LE(imageSize, 20);       // Image size (image buffer + padding).
+    buffer.writeInt32LE(3780, 24);             // Horizontal resolution of the image (pixels per meter, 3780 = 96 DPI).
+    buffer.writeInt32LE(3780, 28);             // Horizontal resolution of the image (pixels per meter, 3780 = 96 DPI).
+    buffer.writeUInt32LE(0, 32);               // Number of colors in the color palette, or 0 to default to 2^n.
+    buffer.writeUInt32LE(0, 36);               // Number of important colors used, or 0 when every color is important; generally ignored.
     return buffer;
 }
 
 /**
- * Get a DIB representation of the raw image data in an image.
+ * Get a DIB representation of the raw image data in a DIB with a mask.
  * Bitmap data starts with the lower left hand corner of the image.
  * Pixel order is blue, green, red, alpha.
  * @see https://en.wikipedia.org/wiki/BMP_file_format
@@ -521,15 +532,21 @@ function getBITMAPINFOHEADER(image: Image): Buffer {
  * @returns Buffer The DIB for the given image.
  */
 function getDIB(image: Image): Buffer {
-    const bytesPerPixel: number = 4; // UPNG.toRGBA8 always gives 4 bytes per pixel (R-G-B-A)
+    // Source bitmap
+    const bitmap: Buffer = Buffer.from(image.data);
+    // Target bitmap
+    const DIB: Buffer = Buffer.alloc(image.data.length);
+    // Mask data
+    const maskSize: number = getMaskSize(image.width, image.height);
+    let maskBits: number[] = [];
+    // Change order from lower to top
+    const bytesPerPixel: number = 4;
     const columns: number = image.width * bytesPerPixel;
     const rows: number = image.height * columns;
     const end: number = rows - columns;
-    const padding = (image.width + (image.width % 32 ? 32 - image.width % 32 : 0)) * image.height / 8;
-    const bitmap: Buffer = Buffer.from(image.data);
-    const DIB: Buffer = Buffer.alloc(image.data.length + padding).fill(255);
     for (let row = 0; row < rows; row += columns) {
         for (let col = 0; col < columns; col += bytesPerPixel) {
+            // Swap pixels from RGBA to BGRA
             let pos = row + col;
             const r = bitmap.readUInt8(pos);
             const g = bitmap.readUInt8(pos + 1);
@@ -540,9 +557,21 @@ function getDIB(image: Image): Buffer {
             DIB.writeUInt8(g, pos + 1);
             DIB.writeUInt8(r, pos + 2);
             DIB.writeUInt8(a, pos + 3);
+            // Store mask bit
+            maskBits.push(bitmap[pos + 3] === 0 ? 1 : 0);
         }
+        const padding = maskBits.length % 32 ? 32 - maskBits.length % 32 : 0;
+        maskBits = maskBits.concat(Array(padding).fill(0));
     }
-    return DIB;
+    // Create mask from mask bits
+    const mask: Buffer[] = [];
+    for (let i = 0; i < maskBits.length; i += 8) {
+      const n: number = parseInt(maskBits.slice(i, i + 8).join(""), 2);
+      const buf: Buffer = Buffer.alloc(1);
+      buf.writeUInt8(n, 0);
+      mask.push(buf);
+    }
+    return Buffer.concat([DIB, Buffer.concat(mask, maskSize)]);
 }
 
 /**
@@ -591,29 +620,30 @@ function blit(source: Image, target: Image, x: number, y: number) {
 }
 
 /**
- * Create the Microsoft ICO format using PNG or Windows bitmaps for every icon.
+ * Create the Microsoft ICO format using PNG and/or Windows bitmaps for every icon.
  * @see https://en.wikipedia.org/wiki/ICO_(file_format)
  * @see resize.js, UPNG.js
- * @see For the `padding` used in `getICONDIRENTRY`, `getBITMAPINFOHEADER` and `getDIB`
- *      see https://github.com/fiahfy/ico. Without padding all icons could be displayed
- *      without problems in all apps tested including Windows Explorer, only IrfanView
- *      couldn't display any of the files.
  * @param input A raw buffer containing the complete source PNG file.
  * @param scalingAlgorithm One of the supported scaling algorithms for resizing.
- * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless, other values (<= 256) means lossy).
- *      Only used if "usePNG" is true.
- * @param usePNG Store each chunk in the generated output in either PNG or Windows BMP format.
- *      PNG as opposed to DIB is valid but older Windows versions may not be able to display it.
+ * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless, other values
+ *        (<= 256) means lossy). Only used if "PNG" is true.
+ * @param PNG Store each chunk in the generated output in either PNG or Windows BMP format. PNG
+ *        as opposed to DIB is valid but older Windows versions may not be able to display it.
+ * @param forWinExe Optional. If true all icons will be stored as PNGs, only the sizes smaller
+ *        than 64 will be stored as BMPs. This avoids display problems with the icon in the file
+ *        properties dialog of Windows versions older than Windows 10. Should be set to true if
+ *        the ICO file is intended to be used for embeddingin a Windows executable. If used, the
+ *        parameter PNG is ignored.
  * @returns A buffer which contains the binary data of the ICO file or null in case of an error.
  */
 export function createICO(input: Buffer, scalingAlgorithm: number,
-                          numOfColors: number, usePNG: boolean): Buffer | null {
+                          numOfColors: number, PNG: boolean, forWinExe?: boolean): Buffer | null {
     // Source for all resizing actions
     let srcImage: Image | null = decodePNG(input);
     if (!srcImage) {
         return null;
     }
-    // Make a quadratic source image (seems to be needed for ICO ??) if necessary.
+    // Make a quadratic source image if necessary (seems to be needed for ICO ??).
     if (srcImage.height !== srcImage.width) {
         let edgeLength: number;
         let blitX: number;
@@ -637,14 +667,14 @@ export function createICO(input: Buffer, scalingAlgorithm: number,
         alphaBackground = null;
     }
     // All chunk sizes
-    const icoChunkSizes: number[] = [16, 24, 32, 48, 64, 72, 96, 128, 256];
+    const icoChunkSizes: number[] = [256, 128, 96, 72, 64, 48, 32, 24, 16];
     // An array which receives the directory header and all entry headers
     const icoDirectory: Buffer[] = [];
     // Create and append directory header
     icoDirectory.push(getICONDIR(icoChunkSizes.length));
     // Final total length of all buffers.
     let totalLength: number = icoDirectory[0].length; // ICONDIR header
-    // Temporary storge for all scaled PNG images
+    // Temporary storage for all scaled images
     const icoChunkImages: Buffer[] = [];
     // Initial offset for the first image
     let chunkOffset: number = icoDirectory[0].length + (icoChunkSizes.length * 16); // fixed length of ICONDIRENTRY is 16
@@ -661,30 +691,46 @@ export function createICO(input: Buffer, scalingAlgorithm: number,
             height: icoChunkRect.Height,
             width: icoChunkRect.Width,
         };
-        // Store entry header, store image and get offset for next image
-        const iconDirEntry: Buffer = getICONDIRENTRY(scaledRawImage, chunkOffset, usePNG);
-        totalLength += iconDirEntry.byteLength;
-        icoDirectory.push(iconDirEntry);
-        if (usePNG) {
+        // Make icon
+        let formatInfo: string;
+        // In Windows executable mode use PNG only for sizes >= 64.
+        if (PNG || (forWinExe && ([256, 128, 96, 72, 64].indexOf(icoChunkRect.Height) !== -1))) {
+            formatInfo = "png";
             const encodedPNG: ArrayBuffer = UPNG.encode(
                 [scaledRawImage.data.buffer],
-                icoChunkRect.Width,
-                icoChunkRect.Height,
+                scaledRawImage.width,
+                scaledRawImage.height,
                 (numOfColors < 0) ? 0 : ((numOfColors > MAX_COLORS) ? MAX_COLORS : numOfColors),
                 [],
                 true,
             );
+            const iconDirEntry: Buffer = getICONDIRENTRY(
+                encodedPNG.byteLength,
+                scaledRawImage.width,
+                scaledRawImage.height,
+                chunkOffset,
+            );
+            icoDirectory.push(iconDirEntry);
             icoChunkImages.push(Buffer.from(encodedPNG));
-            totalLength += encodedPNG.byteLength;
+            totalLength += iconDirEntry.length + encodedPNG.byteLength;
             chunkOffset += encodedPNG.byteLength;
         } else {
+            formatInfo = "bmp";
+            const iconDirEntry: Buffer = getICONDIRENTRY(
+                scaledRawImage.data.length + getMaskSize(scaledRawImage.width, scaledRawImage.height)
+                  + BITMAPINFOHEADERLENGTH,
+                scaledRawImage.width,
+                scaledRawImage.height,
+                chunkOffset,
+            );
+            icoDirectory.push(iconDirEntry);
             const bmpInfoHeader = getBITMAPINFOHEADER(scaledRawImage);
             const DIB = getDIB(scaledRawImage);
-            totalLength += bmpInfoHeader.length + DIB.length;
             icoChunkImages.push(bmpInfoHeader, DIB);
-            chunkOffset += (bmpInfoHeader.length + DIB.length);
+            totalLength += iconDirEntry.length + bmpInfoHeader.length + DIB.length;
+            chunkOffset += bmpInfoHeader.length + DIB.length;
         }
-        LogMessage(`wrote ${usePNG ? "png" : "bmp"} icon for size ${icoChunkSize}`);
+        LogMessage(`wrote ${formatInfo} icon for size ${icoChunkSize}`);
     }
     LogMessage(`done`);
     return Buffer.concat(icoDirectory.concat(icoChunkImages), totalLength);

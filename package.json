@@ -58,7 +58,7 @@
     "@types/node": "*"
   },
   "scripts": {
-    "test": "node png2icons-cli.js sample/sample.png sample/sample -allp -bc -i",
+    "test": "node png2icons-cli.js sample/sample.png sample/sample -allwe -bc -i",
     "lint": "tslint --project ./tsconfig.json --config ./tslint.json",
     "premake": "npm run lint",
     "make": "tsc -p tsconfig.json && node -e \"require('fs').unlinkSync('png2icons-cli.d.ts')\""

@@ -61,12 +61,14 @@ function printUsage(): void {
 
 Don\'t append a file extension to outfile, it will be set automatically.
 
-format  (output format):
-  -icns  Apple ICNS format, creates <outfile>.icns
-  -ico   Windows ICO format, creates <outfile>.ico (contained icons as BMP)
-  -icop  Windows ICO format, creates <outfile>.ico (contained icons as PNG)
-  -all   Create both ICNS and ICO format (ICO with BMP)
-  -allp  Create both ICNS and ICO format (ICO with PNG)
+format    (output format):
+  -icns   Apple ICNS format, creates <outfile>.icns
+  -ico    Windows ICO format, creates <outfile>.ico (contained icons as BMP)
+  -icop   Windows ICO format, creates <outfile>.ico (contained icons as PNG)
+  -icowe  Windows ICO format, creates <outfile>.ico  (for Windows executables)
+  -all    Create both ICNS and ICO format (ICO with BMP)
+  -allp   Create both ICNS and ICO format (ICO with PNG)
+  -allwe  Create both ICNS and ICO format (ICO for Windows executables)
 
 Scaling algorithms:
   -nn (Nearest Neighbor)
@@ -105,7 +107,7 @@ if ((argc < 5) || (argc > 7)) {
     printUsage();
 }
 outputFormat = process.argv[4];
-if (["-icns", "-ico", "-icop", "-all", "-allp"].indexOf(outputFormat) === -1) {
+if (["-icns", "-ico", "-icop", "-icowe", "-all", "-allp", "-allwe"].indexOf(outputFormat) === -1) {
     printUsage();
 }
 for (let i = 5; i < argc; i++) {
@@ -131,6 +133,17 @@ if (argc === 7) {
 
 // Main
 /**
+ * Converter function.
+ */
+type ConverterFn = (
+    input: Buffer,
+    scalingAlgorithm: number,
+    numOfColors: number,
+    usePNG?: boolean,
+    forExe?: boolean,
+) => Buffer | null;
+
+/**
  * Describes a task object to be executed.
  */
 interface ITask {
@@ -141,7 +154,11 @@ interface ITask {
     /**
      * Use PNG as file format for generated icons.
      */
-    UsePNG: boolean;
+    PNG: boolean;
+    /**
+     * Use special mix of PNG and BMP for embedding ICO in a Windows executable file.
+     */
+    ForWinExe: boolean;
     /**
      * File extension.
      */
@@ -149,7 +166,7 @@ interface ITask {
     /**
      * Converter function to be called.
      */
-    ConverterFnc: (input: Buffer, scalingAlgorithm: number, numOfColors: number, usePNG?: boolean) => Buffer | null;
+    TaskFn: ConverterFn;
 }
 
 /**
@@ -157,18 +174,42 @@ interface ITask {
  */
 const tasks: ITask[] = [];
 
+/**
+ * Create a converter task.
+ * @param format Console info for current task.
+ * @param png Use PNG format.
+ * @param forWinExe Create special ICO for Windows executables.
+ * @param fileExt File extension of output file.
+ * @param fn Converter task function.
+ * @returns A converter Task.
+ */
+function getTask(format: string, png: boolean, forWinExe: boolean, fileExt: string, fn: ConverterFn): ITask {
+    return {
+        Format: format,
+        PNG: png,
+        ForWinExe: forWinExe,
+        FileExt: fileExt,
+        TaskFn: fn,
+    };
+}
+
 if (outputFormat === "-icns") {
-    tasks.push({ Format: "ICNS", UsePNG: true, FileExt: "icns", ConverterFnc: PNG2ICONS.createICNS });
+    tasks.push(getTask("ICNS", true, false, "icns", PNG2ICONS.createICNS));
 } else if (outputFormat === "-ico") {
-    tasks.push({ Format: "ICO (BMP)", UsePNG: false, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO });
+    tasks.push(getTask("ICO (BMP)", false, false, "ico", PNG2ICONS.createICO));
 } else if (outputFormat === "-icop") {
-    tasks.push({ Format: "ICO (PNG)", UsePNG: true, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO });
+    tasks.push(getTask("ICO (PNG)", true, false, "ico", PNG2ICONS.createICO));
+} else if (outputFormat === "-icowe") {
+    tasks.push(getTask("ICO (for Windows executable)", false, true, "ico", PNG2ICONS.createICO));
 } else if (outputFormat === "-all") {
-    tasks.push({ Format: "ICNS", UsePNG: true, FileExt: "icns", ConverterFnc: PNG2ICONS.createICNS });
-    tasks.push({ Format: "ICO (BMP)", UsePNG: false, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO});
+    tasks.push(getTask("ICNS", true, false, "icns", PNG2ICONS.createICNS));
+    tasks.push(getTask("ICO (BMP)", false, false, "ico", PNG2ICONS.createICO));
 } else if (outputFormat === "-allp") {
-    tasks.push({ Format: "ICNS", UsePNG: true, FileExt: "icns", ConverterFnc: PNG2ICONS.createICNS });
-    tasks.push({ Format: "ICO (PNG)", UsePNG: true, FileExt: "ico", ConverterFnc: PNG2ICONS.createICO});
+    tasks.push(getTask("ICNS", true, false, "icns", PNG2ICONS.createICNS));
+    tasks.push(getTask("ICO (PNG)", true, false, "ico", PNG2ICONS.createICO));
+} else if (outputFormat === "-allwe") {
+    tasks.push(getTask("ICNS", true, false, "icns", PNG2ICONS.createICNS));
+    tasks.push(getTask("ICO (for Windows executable)", false, true, "ico", PNG2ICONS.createICO));
 } else { // ??
     printUsage();
 }
@@ -197,7 +238,7 @@ for (let i = 0; i < tasks.length; i++) {
   scaling:  ${scalingAlgorithms[scalingAlgorithm]}
   format:   ${task.Format}`;
     consoleLogger(taskInfo);
-    const output: Buffer | null = task.ConverterFnc(input, scalingAlgorithm, 0, task.UsePNG);
+    const output: Buffer | null = task.TaskFn(input, scalingAlgorithm, 0, task.PNG, task.ForWinExe);
     if (output) {
         writeFileSync(`${outputFileStub}.${task.FileExt}`, output);
     }

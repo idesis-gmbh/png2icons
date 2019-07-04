@@ -28,8 +28,10 @@
  *
  * Packbits compression for certain Apple ICNS icon types:
  * https://github.com/fiahfy/packbits
- * and hints from
+ * Hints from
  * https://github.com/fiahfy/packbits/issues/1
+ * Hints for bitmap masks (method createBitmap) from
+ * https://github.com/fiahfy/ico/blob/master/src/index.js
  * Copyright (c) 2018 fiahfy, https://fiahfy.github.io/
  * The MIT License (MIT)
  */
@@ -78,19 +80,20 @@ export declare const HERMITE = 4;
  */
 export declare function createICNS(input: Buffer, scalingAlgorithm: number, numOfColors: number): Buffer | null;
 /**
- * Create the Microsoft ICO format using PNG or Windows bitmaps for every icon.
+ * Create the Microsoft ICO format using PNG and/or Windows bitmaps for every icon.
  * @see https://en.wikipedia.org/wiki/ICO_(file_format)
  * @see resize.js, UPNG.js
- * @see For the `padding` used in `getICONDIRENTRY`, `getBITMAPINFOHEADER` and `getDIB`
- *      see https://github.com/fiahfy/ico. Without padding all icons could be displayed
- *      without problems in all apps tested including Windows Explorer, only IrfanView
- *      couldn't display any of the files.
  * @param input A raw buffer containing the complete source PNG file.
  * @param scalingAlgorithm One of the supported scaling algorithms for resizing.
- * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless, other values (<= 256) means lossy).
- *      Only used if "usePNG" is true.
- * @param usePNG Store each chunk in the generated output in either PNG or Windows BMP format.
- *      PNG as opposed to DIB is valid but older Windows versions may not be able to display it.
+ * @param numOfColors Maximum colors in output ICO chunks (0 = all colors/lossless, other values
+ *        (<= 256) means lossy). Only used if "PNG" is true.
+ * @param PNG Store each chunk in the generated output in either PNG or Windows BMP format. PNG
+ *        as opposed to DIB is valid but older Windows versions may not be able to display it.
+ * @param forWinExe Optional. If true all icons will be stored as PNGs, only the sizes smaller
+ *        than 64 will be stored as BMPs. This avoids display problems with the icon in the file
+ *        properties dialog of Windows versions older than Windows 10. Should be set to true if
+ *        the ICO file is intended to be used for embeddingin a Windows executable. If used, the
+ *        parameter PNG is ignored.
  * @returns A buffer which contains the binary data of the ICO file or null in case of an error.
  */
-export declare function createICO(input: Buffer, scalingAlgorithm: number, numOfColors: number, usePNG: boolean): Buffer | null;
+export declare function createICO(input: Buffer, scalingAlgorithm: number, numOfColors: number, PNG: boolean, forWinExe?: boolean): Buffer | null;

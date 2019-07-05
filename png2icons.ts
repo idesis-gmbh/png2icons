@@ -163,7 +163,15 @@ function getStretchedRect(src: IRect, dst: IRect): IRect {
 }
 
 /**
- * Scale a source image to fit into a new given size.
+ * Holds already scaled images (raw pixels).
+ */
+const scaledImageCache: Image[] = [];
+
+/**
+ * Scale a source image to fit into a new given size. The result of the scaling
+ * is put to a cache. If the cache already contains a scaled image of the same
+ * size this is returned immediately instead. Scaling also isn't done if the
+ * source and destination rectangles are the same.
  * @see resize.js
  * @param srcImage Source image.
  * @param destRect Destination rectangle to fit the rescaled image into.
@@ -174,6 +182,12 @@ function getScaledImageData(srcImage: Image, destRect: IRect, scalingAlgorithm: 
     // Nothing to do
     if ((srcImage.width === destRect.Width) && (srcImage.height === destRect.Height)) {
         return srcImage.data;
+    }
+    // Already rescaled
+    for (const image of scaledImageCache) {
+        if ((destRect.Width === image.width) && (destRect.Height === image.height)) {
+            return image.data;
+        }
     }
     const scaleResult: Image = {
         data: new Uint8Array(destRect.Width * destRect.Height * 4),
@@ -193,6 +207,7 @@ function getScaledImageData(srcImage: Image, destRect: IRect, scalingAlgorithm: 
     } else {
         Resize.bicubicInterpolation(srcImage, scaleResult);
     }
+    scaledImageCache.push(scaleResult);
     return scaleResult.data;
 }
 

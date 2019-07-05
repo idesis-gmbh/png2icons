@@ -42,6 +42,8 @@
   "files": [
     "lib/icns-encoder.js",
     "lib/resize2.js",
+    "lib/resize3.js",
+    "lib/resize3.d.ts",
     "lib/UPNG.js",
     "sample/sample.png",
     "png2icons.js",

@@ -1,6 +1,6 @@
 import { encode as encodeWithPackBitsForICNS } from "./lib/icns-encoder";
 import { Image } from "./lib/Image";
-import * as Resize from "./lib/resize2";
+import * as Resize from "./lib/resize3";
 import * as UPNG from "./lib/UPNG";
 
 /**
@@ -185,13 +185,13 @@ function scaleToFit(srcImage: Image, destRect: IRect, scalingAlgorithm: number):
     } else if (scalingAlgorithm === BILINEAR) {
         Resize.bilinearInterpolation(srcImage, scaleResult);
     } else if (scalingAlgorithm === BICUBIC) {
-        Resize.bicubicInterpolation(srcImage, scaleResult, null);
+        Resize.bicubicInterpolation(srcImage, scaleResult);
     } else if (scalingAlgorithm === BEZIER) {
-        Resize.bezierInterpolation(srcImage, scaleResult, null);
+        Resize.bezierInterpolation(srcImage, scaleResult);
     } else if (scalingAlgorithm === HERMITE) {
-        Resize.hermiteInterpolation(srcImage, scaleResult, null);
+        Resize.hermiteInterpolation(srcImage, scaleResult);
     } else {
-        Resize.bicubicInterpolation(srcImage, scaleResult, null);
+        Resize.bicubicInterpolation(srcImage, scaleResult);
     }
     return scaleResult.data;
 }

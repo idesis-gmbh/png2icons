@@ -140,7 +140,7 @@ function getRect(left: number, top: number, width: number, height: number): IRec
  * @param dst Destination rectangle.
  * @returns A new rectangle where "src" has been upsized/downsized proportionally to fit exactly in to "dst".
  */
-function stretchRect(src: IRect, dst: IRect): IRect {
+function getStretchedRect(src: IRect, dst: IRect): IRect {
     let f: number;
     let tmp: number;
     const result: IRect = getRect(0, 0, 0, 0);
@@ -170,7 +170,7 @@ function stretchRect(src: IRect, dst: IRect): IRect {
  * @param scalingAlgorithm Scaling method (one of the constants NEAREST_NEIGHBOR, BILINEAR, ...).
  * @returns Uint8Array The rescaled image.
  */
-function scaleToFit(srcImage: Image, destRect: IRect, scalingAlgorithm: number): Uint8Array {
+function getScaledImageData(srcImage: Image, destRect: IRect, scalingAlgorithm: number): Uint8Array {
     // Nothing to do
     if ((srcImage.width === destRect.Width) && (srcImage.height === destRect.Height)) {
         return srcImage.data;
@@ -197,29 +197,12 @@ function scaleToFit(srcImage: Image, destRect: IRect, scalingAlgorithm: number):
 }
 
 /**
- * Extract a single channel of an image with n bytes per pixel, e. g. in RGBA format.
- * @param image Input image.
- * @param bpp Number of bytes per pixel.
- * @param channelIndex Position of the channel byte in the <bpp>-value for each pixel.
- * @returns The extracted channel.
- */
-function extractChannel(image: Uint8Array, bpp: number, channelIndex: number): Buffer {
-    const channel: Buffer = Buffer.alloc(image.length / bpp);
-    const length: number = image.length;
-    let outPos: number = 0;
-    for (let i = channelIndex; i < length; i = i + 4) {
-        channel.writeUInt8(image[i], outPos++);
-    }
-    return channel;
-}
-
-/**
  * Create an image form a PNG.
  * @param input A buffer containing the raw PNG data/file.
  * @returns Image An image containing the raw bitmap and the image dimensions.
  * @see Declaration image.d.ts.
  */
-function decodePNG(input: Buffer): Image | null {
+function getImageFromPNG(input: Buffer): Image | null {
     try {
         // Decoded PNG image
         const PNG: UPNG.UPNGImage = UPNG.decode(input);
@@ -232,6 +215,24 @@ function decodePNG(input: Buffer): Image | null {
         LogMessage("Couldn't decode PNG:", e);
         return null;
     }
+}
+
+
+/**
+ * Extract a single channel of an image with n bytes per pixel, e. g. in RGBA format.
+ * @param image Input image.
+ * @param bpp Number of bytes per pixel.
+ * @param channelIndex Position of the channel byte in the <bpp>-value for each pixel.
+ * @returns The extracted channel.
+ */
+function getImageChannel(image: Uint8Array, bpp: number, channelIndex: number): Buffer {
+    const channel: Buffer = Buffer.alloc(image.length / bpp);
+    const length: number = image.length;
+    let outPos: number = 0;
+    for (let i = channelIndex; i < length; i = i + 4) {
+        channel.writeUInt8(image[i], outPos++);
+    }
+    return channel;
 }
 
 ////////////////////////////////////////
@@ -290,13 +291,13 @@ interface IICNSChunkParams {
  *          an "ARGB" header, if applicable.
  */
 function encodeIconWithPackBits(image: Buffer, withAlphaChannel: boolean): Uint8Array {
-    const R: Buffer = encodeWithPackBitsForICNS(extractChannel(image, 4, 0));
-    const G: Buffer = encodeWithPackBitsForICNS(extractChannel(image, 4, 1));
-    const B: Buffer = encodeWithPackBitsForICNS(extractChannel(image, 4, 2));
+    const R: Buffer = encodeWithPackBitsForICNS(getImageChannel(image, 4, 0));
+    const G: Buffer = encodeWithPackBitsForICNS(getImageChannel(image, 4, 1));
+    const B: Buffer = encodeWithPackBitsForICNS(getImageChannel(image, 4, 2));
     if (withAlphaChannel) {
         const header: Buffer = Buffer.alloc(4);
         header.write("ARGB", 0, 4, "ascii");
-        const A: Buffer = encodeWithPackBitsForICNS(extractChannel(image, 4, 3));
+        const A: Buffer = encodeWithPackBitsForICNS(getImageChannel(image, 4, 3));
         return Buffer.concat([header, A, R, G, B], header.length + A.length + R.length + G.length + B.length);
     } else {
         return Buffer.concat([R, G, B], R.length + G.length + B.length);
@@ -318,13 +319,13 @@ function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scaling
                          numOfColors: number, outBuffer: Buffer): Buffer | null {
     try {
         // Fit source rect to target rect
-        const icnsChunkRect: IRect = stretchRect(
+        const icnsChunkRect: IRect = getStretchedRect(
             getRect(0, 0, srcImage.width, srcImage.height),
             getRect(0, 0, chunkParams.Size,
                 chunkParams.Size),
         );
         // Scale image
-        const scaledRawData: Uint8Array = scaleToFit(srcImage, icnsChunkRect, scalingAlgorithm);
+        const scaledRawData: Uint8Array = getScaledImageData(srcImage, icnsChunkRect, scalingAlgorithm);
         // Icon buffer
         let encodedIcon: ArrayBuffer;
         // Header bytes or every icon
@@ -354,7 +355,7 @@ function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scaling
 
             case IconFormat.Alpha:
                 // Aplpha channel is provided as is.
-                encodedIcon = extractChannel(Buffer.from(scaledRawData.buffer), 4, 3);
+                encodedIcon = getImageChannel(Buffer.from(scaledRawData.buffer), 4, 3);
                 break;
 
             default:
@@ -382,7 +383,7 @@ function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scaling
  */
 export function createICNS(input: Buffer, scalingAlgorithm: number, numOfColors: number): Buffer | null {
     // Source for all resizing actions
-    const srcImage: Image | null = decodePNG(input);
+    const srcImage: Image | null = getImageFromPNG(input);
     if (!srcImage) {
         return null;
     }
@@ -639,7 +640,7 @@ function blit(source: Image, target: Image, x: number, y: number) {
 export function createICO(input: Buffer, scalingAlgorithm: number,
                           numOfColors: number, PNG: boolean, forWinExe?: boolean): Buffer | null {
     // Source for all resizing actions
-    let srcImage: Image | null = decodePNG(input);
+    let srcImage: Image | null = getImageFromPNG(input);
     if (!srcImage) {
         return null;
     }
@@ -681,13 +682,13 @@ export function createICO(input: Buffer, scalingAlgorithm: number,
     // Process each chunk
     for (const icoChunkSize of icoChunkSizes) {
         // Target rect for scaled image
-        const icoChunkRect = stretchRect(
+        const icoChunkRect = getStretchedRect(
             getRect(0, 0, srcImage.width, srcImage.height),
             getRect(0, 0, icoChunkSize, icoChunkSize),
         );
         // Get scaled raw image
         const scaledRawImage: Image = {
-            data: scaleToFit(srcImage, icoChunkRect, scalingAlgorithm),
+            data: getScaledImageData(srcImage, icoChunkRect, scalingAlgorithm),
             height: icoChunkRect.Height,
             width: icoChunkRect.Width,
         };

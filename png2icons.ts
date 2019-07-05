@@ -232,6 +232,48 @@ function getImageFromPNG(input: Buffer): Image | null {
     }
 }
 
+/**
+ * An already PNG encoded image.
+ */
+interface IPNGImage {
+    // tslint:disable-next-line: completed-docs
+    Data: ArrayBuffer;
+    // tslint:disable-next-line: completed-docs
+    Width: number;
+    // tslint:disable-next-line: completed-docs
+    Height: number;
+}
+
+/**
+ * Holds already scaled images (PNG encoded).
+ */
+const scaledPNGImageCache: IPNGImage[] = [];
+
+/**
+ * Encode a raw RGBA image to PNG. The result of the encoding is put to a cache.
+ * If the cache already contains a PNG image of the same size this is returned
+ * immediately instead.
+ * @param rgba An ArrayBuffer holding the raw RGBA image data.
+ * @param width Width of the image to be encoded.
+ * @param height Height of the image to be encoded.
+ * @param numOfColors Number of colors to reduce to.
+ * @returns A PNG image.
+ */
+function getCachedPNG(rgba: ArrayBuffer, width: number, height: number, numOfColors: number) {
+    // Already encoded
+    for (const image of scaledPNGImageCache) {
+        if ((image.Width === width) && (image.Height === height)) {
+            return image.Data;
+        }
+    }
+    const result = UPNG.encode([rgba], width, height, numOfColors, [], true);
+    scaledPNGImageCache.push({
+        Data: result,
+        Width: width,
+        Height: height,
+    });
+    return result;
+}
 
 /**
  * Extract a single channel of an image with n bytes per pixel, e. g. in RGBA format.
@@ -350,15 +392,13 @@ function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scaling
         // Write icon
         switch (chunkParams.Format) {
             case IconFormat.PNG:
-                    encodedIcon = UPNG.encode(
-                        [scaledRawData.buffer],
-                        icnsChunkRect.Width,
-                        icnsChunkRect.Height,
-                        numOfColors,
-                        [],
-                        true,
-                    );
-                    break;
+                encodedIcon = getCachedPNG(
+                    scaledRawData.buffer,
+                    icnsChunkRect.Width,
+                    icnsChunkRect.Height,
+                    numOfColors,
+                );
+                break;
 
             case IconFormat.PackBitsARGB:
                 encodedIcon = encodeIconWithPackBits(Buffer.from(scaledRawData.buffer), true);
@@ -582,10 +622,10 @@ function getDIB(image: Image): Buffer {
     // Create mask from mask bits
     const mask: Buffer[] = [];
     for (let i = 0; i < maskBits.length; i += 8) {
-      const n: number = parseInt(maskBits.slice(i, i + 8).join(""), 2);
-      const buf: Buffer = Buffer.alloc(1);
-      buf.writeUInt8(n, 0);
-      mask.push(buf);
+        const n: number = parseInt(maskBits.slice(i, i + 8).join(""), 2);
+        const buf: Buffer = Buffer.alloc(1);
+        buf.writeUInt8(n, 0);
+        mask.push(buf);
     }
     return Buffer.concat([DIB, Buffer.concat(mask, maskSize)]);
 }
@@ -712,29 +752,28 @@ export function createICO(input: Buffer, scalingAlgorithm: number,
         // In Windows executable mode use PNG only for sizes >= 64.
         if (PNG || (forWinExe && ([256, 128, 96, 72, 64].indexOf(icoChunkRect.Height) !== -1))) {
             formatInfo = "png";
-            const encodedPNG: ArrayBuffer = UPNG.encode(
-                [scaledRawImage.data.buffer],
+            const encodedIcon = getCachedPNG(
+                scaledRawImage.data.buffer,
                 scaledRawImage.width,
                 scaledRawImage.height,
                 (numOfColors < 0) ? 0 : ((numOfColors > MAX_COLORS) ? MAX_COLORS : numOfColors),
-                [],
-                true,
             );
             const iconDirEntry: Buffer = getICONDIRENTRY(
-                encodedPNG.byteLength,
+                encodedIcon.byteLength,
                 scaledRawImage.width,
                 scaledRawImage.height,
                 chunkOffset,
             );
             icoDirectory.push(iconDirEntry);
-            icoChunkImages.push(Buffer.from(encodedPNG));
-            totalLength += iconDirEntry.length + encodedPNG.byteLength;
-            chunkOffset += encodedPNG.byteLength;
+            icoChunkImages.push(Buffer.from(encodedIcon));
+            totalLength += iconDirEntry.length + encodedIcon.byteLength;
+            chunkOffset += encodedIcon.byteLength;
         } else {
             formatInfo = "bmp";
             const iconDirEntry: Buffer = getICONDIRENTRY(
-                scaledRawImage.data.length + getMaskSize(scaledRawImage.width, scaledRawImage.height)
-                  + BITMAPINFOHEADERLENGTH,
+                scaledRawImage.data.length
+                    + getMaskSize(scaledRawImage.width, scaledRawImage.height)
+                    + BITMAPINFOHEADERLENGTH,
                 scaledRawImage.width,
                 scaledRawImage.height,
                 chunkOffset,

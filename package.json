@@ -45,15 +45,13 @@
     "lib/resize3.js",
     "lib/resize3.d.ts",
     "lib/UPNG.js",
+    "lib/UZIP.js",
     "sample/sample.png",
     "png2icons.js",
     "png2icons-cli.js",
     "png2icons.d.ts"
   ],
   "types": "png2icons.d.ts",
-  "dependencies": {
-    "pako": "1.0.10"
-  },
   "devDependencies": {
     "typescript": "3.5.2",
     "tslint": "5.18.0",

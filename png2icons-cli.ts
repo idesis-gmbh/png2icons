@@ -76,6 +76,7 @@ Scaling algorithms:
   -bc (Bicubic, default)
   -bz (Bezier)
   -hm (Hermite)
+  -bc2 (Bicubic, alternative faster version)
 
 -i  print messages`;
     console.log(usage);
@@ -97,6 +98,10 @@ function evalArg(arg: string): void {
         scalingAlgorithm = PNG2ICONS.BEZIER;
     } else if (arg === "-hm") {
         scalingAlgorithm = PNG2ICONS.HERMITE;
+    } else if (arg === "-bc2") {
+        scalingAlgorithm = PNG2ICONS.BICUBIC2;
+    // } else if (arg === "-bl2") {
+    //     scalingAlgorithm = PNG2ICONS.BILINEAR2;
     } else if (arg === "-i") {
         printInfo = true;
     }
@@ -111,7 +116,7 @@ if (["-icns", "-ico", "-icop", "-icowe", "-all", "-allp", "-allwe"].indexOf(outp
     printUsage();
 }
 for (let i = 5; i < argc; i++) {
-    if (["-nn", "-bl", "-bc", "-bz", "-hm", "-i"].indexOf(process.argv[i]) === -1) {
+    if (["-nn", "-bl", "-bc", "-bz", "-hm", "-bc2", /*"-bl2",*/ "-i"].indexOf(process.argv[i]) === -1) {
         printUsage();
     }
 }

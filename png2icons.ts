@@ -1,6 +1,7 @@
 import { encode as encodeWithPackBitsForICNS } from "./lib/icns-encoder";
 import { Image } from "./lib/Image";
 import * as Resize from "./lib/resize3";
+import * as Resize4 from "./lib/resize4";
 import * as UPNG from "./lib/UPNG";
 
 /**
@@ -84,29 +85,39 @@ const MAX_COLORS: number = 256;
 
 /**
  * `Nearest neighbor` resizing interploation algorithm.
- * @see resize.js
+ * @see resize3.js
  */
 export const NEAREST_NEIGHBOR = 0;
 /**
  * `Bilinear` resizing interploation algorithm.
- * @see resize.js
+ * @see resize3.js
  */
 export const BILINEAR = 1;
 /**
  * `Bicubic` resizing interploation algorithm.
- * @see resize.js
+ * @see resize3.js
  */
 export const BICUBIC = 2;
 /**
  * `Bezier` resizing interploation algorithm.
- * @see resize.js
+ * @see resize3.js
  */
 export const BEZIER = 3;
 /**
  * `Hermite` resizing interploation algorithm.
- * @see resize.js
+ * @see resize3.js
  */
 export const HERMITE = 4;
+/**
+ * `Bicubic` resizing interploation algorithm.
+ * @see resize4.js
+ */
+export const BICUBIC2 = 5;
+/**
+ * `Bilinear` resizing interploation algorithm.
+ * @see resize4.js
+ */
+// export const BILINEAR2 = 6;
 
 /**
  * Simple rectangle.
@@ -204,6 +215,10 @@ function getScaledImageData(srcImage: Image, destRect: IRect, scalingAlgorithm: 
         Resize.bezierInterpolation(srcImage, scaleResult);
     } else if (scalingAlgorithm === HERMITE) {
         Resize.hermiteInterpolation(srcImage, scaleResult);
+    } else if (scalingAlgorithm === BICUBIC2) {
+        Resize4.bicubic(srcImage, scaleResult, destRect.Width / srcImage.width);
+    // } else if (scalingAlgorithm === BILINEAR2) {
+    //     Resize4.bilinear(srcImage, scaleResult, destRect.Width / srcImage.width);
     } else {
         Resize.bicubicInterpolation(srcImage, scaleResult);
     }

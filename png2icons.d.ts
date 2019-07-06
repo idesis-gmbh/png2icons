@@ -47,29 +47,34 @@ export declare type Logger = (message: any, ...optionalParams: any[]) => void;
 export declare function setLogger(logger: Logger): void;
 /**
  * `Nearest neighbor` resizing interploation algorithm.
- * @see resize.js
+ * @see resize3.js
  */
 export declare const NEAREST_NEIGHBOR = 0;
 /**
  * `Bilinear` resizing interploation algorithm.
- * @see resize.js
+ * @see resize3.js
  */
 export declare const BILINEAR = 1;
 /**
  * `Bicubic` resizing interploation algorithm.
- * @see resize.js
+ * @see resize3.js
  */
 export declare const BICUBIC = 2;
 /**
  * `Bezier` resizing interploation algorithm.
- * @see resize.js
+ * @see resize3.js
  */
 export declare const BEZIER = 3;
 /**
  * `Hermite` resizing interploation algorithm.
- * @see resize.js
+ * @see resize3.js
  */
 export declare const HERMITE = 4;
+/**
+ * `Bicubic` resizing interploation algorithm.
+ * @see resize4.js
+ */
+export declare const BICUBIC2 = 5;
 /**
  * Create the Apple ICNS format.
  * @see resize.js, UPNG.js

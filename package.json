@@ -16,13 +16,14 @@
   "author": {
     "name": "Michael Nitze",
     "email": "michael.nitze@idesis.de",
-    "url": "http://www.idesis.de"
+    "url": "https://www.idesis.de"
   },
   "contributors": [
-    "Ivan Kutskir (http://www.photopea.com)",
+    "Ivan Kutskir (https://www.photopea.com)",
     "Guyon Roche (https://github.com/guyonroche)",
     "Oliver Moran (https://github.com/oliver-moran)",
-    "fiahfy (https://fiahfy.github.io/)"
+    "fiahfy (https://fiahfy.github.io/)",
+    "Reddit user imbcmdth (https://www.reddit.com/user/imbcmdth/)"
   ],
   "repository": {
     "type": "git",
@@ -64,6 +65,13 @@
   },
   "scripts": {
     "test": "node png2icons-cli.js sample/sample.png sample/sample -allwe -bc -i",
+    "test_all_bmp": "node png2icons-cli.js sample/sample.png sample/sample -all -bc -i",
+    "test_all_png": "node png2icons-cli.js sample/sample.png sample/sample -allp -bc -i",
+    "test_all_we": "node png2icons-cli.js sample/sample.png sample/sample -allwe -bc -i",
+    "test_icns": "node png2icons-cli.js sample/sample.png sample/sample -icns -bc -i",
+    "test_ico_bmp": "node png2icons-cli.js sample/sample.png sample/sample_bmp -ico -bc -i",
+    "test_ico_png": "node png2icons-cli.js sample/sample.png sample/sample_png -icop -bc -i",
+    "test_ico_we": "node png2icons-cli.js sample/sample.png sample/sample_we -icowe -bc -i",
     "lint": "tslint --project ./tsconfig.json --config ./tslint.json",
     "premake": "npm run lint",
     "make": "tsc -p tsconfig.json && node -e \"require('fs').unlinkSync('png2icons-cli.d.ts')\""

@@ -291,6 +291,83 @@ function getCachedPNG(rgba: ArrayBuffer, width: number, height: number, numOfCol
 }
 
 /**
+ * Scans through a region of the bitmap, calling a function for each pixel.
+ * @param x The x coordinate to begin the scan at.
+ * @param y The y coordiante to begin the scan at.
+ * @param w The width of the scan region.
+ * @param h The height of the scan region.
+ * @param f A function to call on every pixel; the (x, y) position of the pixel
+ *        and the index of the pixel in the bitmap buffer are passed to the function.
+ */
+function scanImage(image: Image,
+                   x: number, y: number,
+                   w: number, h: number,
+                   f: (sx: number, sy: number, idx: number) => void): void {
+    for (let _y = y; _y < (y + h); _y++) {
+        for (let _x = x; _x < (x + w); _x++) {
+            // tslint:disable-next-line:no-bitwise
+            const idx = (image.width * _y + _x) << 2;
+            f.call(image, _x, _y, idx);
+        }
+    }
+}
+
+/**
+ * Blits a source image onto a target image.
+ * @param source The source image.
+ * @param target The target image.
+ * @param x The x position in target to blit the source image.
+ * @param y The y position target to blit the source image.
+ */
+function blit(source: Image, target: Image, x: number, y: number) {
+    x = Math.round(x);
+    y = Math.round(y);
+    scanImage(source, 0, 0, source.width, source.height, (sx: number, sy: number, idx: number) => {
+        if ((x + sx >= 0) && (y + sy >= 0) && (target.width - x - sx > 0) && (target.height - y - sy > 0)) {
+            // tslint:disable-next-line:no-bitwise
+            const destIdx = (target.width * (y + sy) + (x + sx)) << 2;
+            // const destIdx = getPixelIndex(target, x + sx, y + sy);
+            target.data[destIdx] = source.data[idx];
+            target.data[destIdx + 1] = source.data[idx + 1];
+            target.data[destIdx + 2] = source.data[idx + 2];
+            target.data[destIdx + 3] = source.data[idx + 3];
+        }
+    });
+}
+
+/**
+ * Create a quadratic image form a non quadratic image. The source image
+ * will be centered horizontally and vertically onto the result image.
+ * The "non-used" pixels in the target image are used as an alpha channel.
+ * @param image A non-quadratic image.
+ * @returns A quadratic image.
+ */
+function getQuadraticImage(image: Image): Image {
+    if (image.height === image.width) {
+        return image;
+    }
+    let edgeLength: number;
+    let blitX: number;
+    let blitY: number;
+    if (image.height > image.width) {
+        edgeLength = image.height;
+        blitX = (image.height - image.width) / 2;
+        blitY = 0;
+    } else {
+        edgeLength = image.width;
+        blitX = 0;
+        blitY = (image.width - image.height) / 2;
+    }
+    const result: Image | null = {
+        data: new Uint8Array(edgeLength * edgeLength * 4),
+        height: edgeLength,
+        width: edgeLength,
+    };
+    blit(image, result, blitX, blitY);
+    return result;
+}
+
+/**
  * Extract a single channel of an image with n bytes per pixel, e. g. in RGBA format.
  * @param image Input image.
  * @param bpp Number of bytes per pixel.
@@ -646,51 +723,6 @@ function getDIB(image: Image): Buffer {
 }
 
 /**
- * Scans through a region of the bitmap, calling a function for each pixel.
- * @param x The x coordinate to begin the scan at.
- * @param y The y coordiante to begin the scan at.
- * @param w The width of the scan region.
- * @param h The height of the scan region.
- * @param f A function to call on every pixel; the (x, y) position of the pixel
- *        and the index of the pixel in the bitmap buffer are passed to the function.
- */
-function scanImage(image: Image,
-                   x: number, y: number,
-                   w: number, h: number,
-                   f: (sx: number, sy: number, idx: number) => void): void {
-    for (let _y = y; _y < (y + h); _y++) {
-        for (let _x = x; _x < (x + w); _x++) {
-            // tslint:disable-next-line:no-bitwise
-            const idx = (image.width * _y + _x) << 2;
-            f.call(image, _x, _y, idx);
-        }
-    }
-}
-
-/**
- * Blits a source image onto a target image.
- * @param source The source image.
- * @param target The target image.
- * @param x The x position in target to blit the source image.
- * @param y The y position target to blit the source image.
- */
-function blit(source: Image, target: Image, x: number, y: number) {
-    x = Math.round(x);
-    y = Math.round(y);
-    scanImage(source, 0, 0, source.width, source.height, (sx: number, sy: number, idx: number) => {
-        if ((x + sx >= 0) && (y + sy >= 0) && (target.width - x - sx > 0) && (target.height - y - sy > 0)) {
-            // tslint:disable-next-line:no-bitwise
-            const destIdx = (target.width * (y + sy) + (x + sx)) << 2;
-            // const destIdx = getPixelIndex(target, x + sx, y + sy);
-            target.data[destIdx] = source.data[idx];
-            target.data[destIdx + 1] = source.data[idx + 1];
-            target.data[destIdx + 2] = source.data[idx + 2];
-            target.data[destIdx + 3] = source.data[idx + 3];
-        }
-    });
-}
-
-/**
  * Create the Microsoft ICO format using PNG and/or Windows bitmaps for every icon.
  * @see https://en.wikipedia.org/wiki/ICO_(file_format)
  * @see resize.js, UPNG.js
@@ -715,28 +747,7 @@ export function createICO(input: Buffer, scalingAlgorithm: number,
         return null;
     }
     // Make a quadratic source image if necessary (seems to be needed for ICO ??).
-    if (srcImage.height !== srcImage.width) {
-        let edgeLength: number;
-        let blitX: number;
-        let blitY: number;
-        if (srcImage.height > srcImage.width) {
-            edgeLength = srcImage.height;
-            blitX = (srcImage.height - srcImage.width) / 2;
-            blitY = 0;
-        } else {
-            edgeLength = srcImage.width;
-            blitX = 0;
-            blitY = (srcImage.width - srcImage.height) / 2;
-        }
-        let alphaBackground: Image | null = {
-            data: Buffer.alloc(edgeLength * edgeLength * 4, 0),
-            height: edgeLength,
-            width: edgeLength,
-        };
-        blit(srcImage, alphaBackground, blitX, blitY);
-        srcImage = alphaBackground;
-        alphaBackground = null;
-    }
+    srcImage = getQuadraticImage(srcImage);
     // All chunk sizes
     const icoChunkSizes: number[] = [256, 128, 96, 72, 64, 48, 32, 24, 16];
     // An array which receives the directory header and all entry headers

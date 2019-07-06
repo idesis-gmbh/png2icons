@@ -530,10 +530,13 @@ function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scaling
  */
 export function createICNS(input: Buffer, scalingAlgorithm: number, numOfColors: number): Buffer | null {
     // Source for all resizing actions
-    const srcImage: Image | null = getImageFromPNG(input);
-    if (!srcImage) {
+    let inputImage: Image | null = getImageFromPNG(input);
+    if (!inputImage) {
         return null;
     }
+    // Make source image quadratic.
+    const srcImage = getQuadraticImage(inputImage);
+    inputImage = null;
     // All available chunk types
     const icnsChunks: IICNSChunkParams[] = [
         // Note: Strange enough, but the order of the different chunks in the output file
@@ -742,12 +745,13 @@ function getDIB(image: Image): Buffer {
 export function createICO(input: Buffer, scalingAlgorithm: number,
                           numOfColors: number, PNG: boolean, forWinExe?: boolean): Buffer | null {
     // Source for all resizing actions
-    let srcImage: Image | null = getImageFromPNG(input);
-    if (!srcImage) {
+    let inputImage: Image | null = getImageFromPNG(input);
+    if (!inputImage) {
         return null;
     }
-    // Make a quadratic source image if necessary (seems to be needed for ICO ??).
-    srcImage = getQuadraticImage(srcImage);
+    // Make source image quadratic.
+    const srcImage = getQuadraticImage(inputImage);
+    inputImage = null;
     // All chunk sizes
     const icoChunkSizes: number[] = [256, 128, 96, 72, 64, 48, 32, 24, 16];
     // An array which receives the directory header and all entry headers

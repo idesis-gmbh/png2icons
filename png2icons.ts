@@ -291,6 +291,40 @@ function getCachedPNG(rgba: ArrayBuffer, width: number, height: number, numOfCol
 }
 
 /**
+ * The image which is currently processed.
+ * @see function `checkCache()`.
+ */
+let currentImage: Buffer | null = null;
+
+/**
+ * Checks if the given image has been cached/processed already. If the
+ * given image differs from the current one both caches are cleared.
+ * @param image The (new) input image.
+ */
+function checkCache(image: Buffer): void {
+    if (!image) {
+        return;
+    }
+    if (!currentImage) {
+        currentImage = image;
+        return;
+    }
+    if (image.compare(currentImage) !== 0) {
+        clearCache();
+        currentImage = image;
+    }
+}
+
+/**
+ * Clears both image caches (input PNG and scaled images).
+ */
+export function clearCache(): void {
+    scaledPNGImageCache.length = 0;
+    scaledImageCache.length = 0;
+    currentImage = null;
+}
+
+/**
  * Scans through a region of the bitmap, calling a function for each pixel.
  * @param x The x coordinate to begin the scan at.
  * @param y The y coordiante to begin the scan at.
@@ -529,6 +563,8 @@ function appendIcnsChunk(chunkParams: IICNSChunkParams, srcImage: Image, scaling
  * @returns A buffer which contains the binary data of the ICNS file or null in case of an error.
  */
 export function createICNS(input: Buffer, scalingAlgorithm: number, numOfColors: number): Buffer | null {
+    // Handle caching of input.
+    checkCache(input);
     // Source for all resizing actions
     let inputImage: Image | null = getImageFromPNG(input);
     if (!inputImage) {
@@ -744,6 +780,8 @@ function getDIB(image: Image): Buffer {
  */
 export function createICO(input: Buffer, scalingAlgorithm: number,
                           numOfColors: number, PNG: boolean, forWinExe?: boolean): Buffer | null {
+    // Handle caching of input.
+    checkCache(input);
     // Source for all resizing actions
     let inputImage: Image | null = getImageFromPNG(input);
     if (!inputImage) {

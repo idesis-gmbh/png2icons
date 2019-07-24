@@ -70,12 +70,13 @@ This will create the files `icon.icns` and `icon.ico` where `icon.ico` contains 
 
 ## API usage
 
-The module exports three functions:
+The module exports four functions:
 
 ```
 function createICNS(input, scalingAlgorithm, numOfColors)
 function createICO(input, scalingAlgorithm, numOfColors, usePNG, forWinExe)
 function setLogger(logFn)
+function clearCache()
 ```
 
 `createICNS` creates the Apple ICNS format, `createICO` creates the Microsoft ICO format.
@@ -102,6 +103,8 @@ If the boolean parameter `usePNG` for `createICO` is set to `true` this function
 If the optional parameter `forWinExe` for `createICO` is set to `true` png2icons will create a mix of PNG and BMP icons in the generated output. The icon sizes 16, 24, 32 and 48 will be in BMP format and all others in PNG format. This helps to reduce the ICO file size. Using BMP for the smaller icon sizes prevents display problems in the file properties dialog of Windows versions older than Windows 10. This parameter should be used, if an ICO file for embedding in Windows executables must be created (for example for Electron apps).
 
 With `setLogger` you can supply your own logging function. The logging function (`logFn`) must accept the same parameters like `console.log`, so you could use that in simple cases, e. g. `setLogger(console.log)`. No logging function is set by default.
+
+`clearCache`: png2icons tries to cache as much image data as possible to speed up processing. If, for example, the same input image is used to create multiple different output formats it reuses already scaled images. `clearCache` frees all internally cached image data .
 
 The return value is `null` in case of an error, otherwise a buffer which contains the binary data of the generated ICNS/ICO file is returned. You could use, for example, `fs.writeFileSync` to save it as a file.
 
@@ -167,6 +170,11 @@ See the `LICENSE` file for details.
 
 
 ## Changelog
+
+### 2.0.1
+
+- Fixed image caching bug which used the first given input forever on all subsequent API calls.
+- Added exported function `clearCache()`.
 
 ### 2.0.0
 

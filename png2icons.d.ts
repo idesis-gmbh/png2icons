@@ -76,6 +76,10 @@ export declare const HERMITE = 4;
  */
 export declare const BICUBIC2 = 5;
 /**
+ * Clears both image caches (input PNG and scaled images).
+ */
+export declare function clearCache(): void;
+/**
  * Create the Apple ICNS format.
  * @see resize.js, UPNG.js
  * @param input A raw buffer containing the complete source PNG file.
